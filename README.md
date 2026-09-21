@@ -29,7 +29,7 @@ Step ids: `checkin photos unbox · brain ups wake printer term lcd periph cables
 ## Build
 
 ```bash
-node build.mjs
+npm run build:pages
 ```
 
 Reads `logo.png`, inlines it into both sources, and writes `dist/app.html`, `dist/sheet.html`, and the root `index.html` (a copy of the app). To regenerate the blank PDF from the sheet (Windows, headless Edge):

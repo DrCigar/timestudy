@@ -4,7 +4,7 @@
   "type": "module",
   "description": "360 Pro install time study: static app at the root, Neon-backed API under /api.",
   "scripts": {
-    "build": "node build.mjs"
+    "build:pages": "node build.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2"
