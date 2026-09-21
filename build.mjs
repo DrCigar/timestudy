@@ -8,4 +8,5 @@ for (const name of ['artifact.html', 'sheet.html']) {
   const html = fs.readFileSync(`${dir}/src/${name}`, 'utf8').split('{{LOGO}}').join(logo);
   fs.writeFileSync(`${dir}/dist/${name}`, html);
   console.log('built dist/' + name, html.length);
+  if (name === 'sheet.html') { fs.writeFileSync(dir + '/index.html', html); console.log('built index.html (root copy of the sheet for static hosting)'); }
 }

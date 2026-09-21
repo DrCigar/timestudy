@@ -6,6 +6,7 @@ Two versions of the same sheet. An installer enters how long each step of a 360 
 |------|------------|
 | `src/artifact.html` | Web app published as a claude.ai artifact. Installers save studies to shared storage; team averages sit behind a password under the gear icon. |
 | `src/sheet.html` | Self-contained offline version. Works from a file on any device, totals as you type, and prints as a one-page blank form. |
+| `index.html` | Built copy of the offline sheet at the repo root, so a static host such as Vercel serves it with no configuration. |
 | `dist/` | Built copies with the POS360 logo inlined, plus the printed blank PDF. |
 
 Live artifact: https://claude.ai/artifact/BiVD4DQBQ5euo2AdyUHMK8
@@ -30,7 +31,7 @@ Step ids: `checkin photos unbox · brain ups wake printer term lcd periph cables
 node build.mjs
 ```
 
-Reads `logo.png`, inlines it into both sources, and writes `dist/artifact.html` and `dist/sheet.html`. To regenerate the blank PDF from the sheet (Windows, headless Edge):
+Reads `logo.png`, inlines it into both sources, and writes `dist/artifact.html`, `dist/sheet.html`, and the root `index.html` (a copy of the sheet). To regenerate the blank PDF from the sheet (Windows, headless Edge):
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File render-sheet.ps1
@@ -56,4 +57,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File render-sheet.ps1
 
 ## The offline sheet
 
-`dist/sheet.html` can be sent as a file or hosted anywhere static. It keeps a draft in the browser's local storage, copies a Slack-ready summary, downloads a CSV, and prints as a one-page blank paper form.
+`dist/sheet.html` can be sent as a file or hosted anywhere static; the root `index.html` is the same page, so connecting this repo to Vercel with no framework preset serves it at the project URL. It keeps a draft in the browser's local storage, copies a Slack-ready summary, downloads a CSV, and prints as a one-page blank paper form.
