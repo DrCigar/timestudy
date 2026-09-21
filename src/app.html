@@ -2,20 +2,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;600;700;800&display=swap" rel="stylesheet">
 <style>
+  /* Dark by design. An explicit light choice on the host still gets a light palette. */
   :root{
-    --black:#000; --ink:#0F0F0F; --verm:#EF4023; --verm-soft:rgba(239,64,35,.12);
+    --black:#000; --ink:#0F0F0F; --verm:#EF4023; --verm-soft:rgba(239,64,35,.20);
+    --paper:#1B1B1A; --ground:#111110; --surface:#1B1B1A; --surface2:#232322; --line:#33332F; --line2:#2A2A28;
+    --text:#F2F2EE; --muted:#A3A39E; --wait:#8A8A86; --ok:#2FAE4E; --hdr:#000; --hdr-text:#fff; --hdr-muted:#9A9A9A;
+    --focus:0 0 0 3px rgba(239,64,35,.30);
+    color-scheme: dark;
+  }
+  :root[data-theme="light"]{
+    --verm-soft:rgba(239,64,35,.12);
     --paper:#FFFFFF; --ground:#EFEFED; --surface:#FFFFFF; --surface2:#F5F5F3; --line:#DDDDD9; --line2:#EBEBEB;
-    --text:#0F0F0F; --muted:#6B6B68; --wait:#7A7A78; --ok:#2FAE4E; --hdr:#000; --hdr-text:#fff; --hdr-muted:#BDBDBD;
+    --text:#0F0F0F; --muted:#6B6B68; --wait:#7A7A78; --hdr:#000; --hdr-text:#fff; --hdr-muted:#BDBDBD;
     --focus:0 0 0 3px rgba(239,64,35,.22);
+    color-scheme: light;
   }
-  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-    --paper:#1B1B1A; --ground:#111110; --surface:#1B1B1A; --surface2:#232322; --line:#33332F; --line2:#2A2A28;
-    --text:#F2F2EE; --muted:#A3A39E; --wait:#8A8A86; --hdr:#000; --hdr-text:#fff; --hdr-muted:#9A9A9A; --verm-soft:rgba(239,64,35,.20);
-  }}
-  :root[data-theme="dark"]{
-    --paper:#1B1B1A; --ground:#111110; --surface:#1B1B1A; --surface2:#232322; --line:#33332F; --line2:#2A2A28;
-    --text:#F2F2EE; --muted:#A3A39E; --wait:#8A8A86; --hdr:#000; --hdr-text:#fff; --hdr-muted:#9A9A9A; --verm-soft:rgba(239,64,35,.20);
-  }
+  .kpi.dark,.big{ background:#000; }
+  :root[data-theme="light"] .kpi.dark, :root[data-theme="light"] .big{ background:var(--ink); }
   *{ box-sizing:border-box; margin:0; padding:0; }
   body{ background:var(--ground); color:var(--text); font-family:'Figtree',Calibri,'Segoe UI',sans-serif; font-weight:300; font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
   b,strong{ font-weight:700; }
@@ -321,6 +324,23 @@
 
   // ---------- capabilities (resolve later, never block first paint) ----------
   let db = null, user = null, downloads = null, uid = null, canWrite = null, isAdmin = false;
+  // mode: 'claude' (artifact runtime), 'rest' (this repo's /api on a static host), 'preview' (neither)
+  let mode = 'preview'; const API = '/api';
+  let gateSet = false; // rest mode only learns whether a password exists, never the hash
+  const gateKey = () => { try { return sessionStorage.getItem('pos360-ts-unlock') || ''; } catch(e){ return ''; } };
+  async function api(path, opts = {}){
+    const r = await fetch(API + path, { ...opts, headers: { 'content-type':'application/json', 'x-results-key': gateKey(), ...(opts.headers||{}) } });
+    if (!r.ok) { const err = new Error('api ' + r.status); err.status = r.status; err.code = r.status === 401 ? 'locked' : r.status === 507 ? 'quota_exceeded' : 'unavailable'; throw err; }
+    return r.status === 204 ? null : r.json();
+  }
+  const store = {
+    add: doc => mode === 'claude' ? db.collection('studies').add(doc) : api('/studies', { method:'POST', body: JSON.stringify(doc) }),
+    list: () => api('/studies'),
+    remove: id => mode === 'claude' ? db.doc('studies/' + id).delete() : api('/studies?id=' + encodeURIComponent(id), { method:'DELETE' }),
+    getGate: async () => { if (mode === 'claude') { const snap = await db.doc('config/gate').get(); return snap.exists ? (snap.data().hash || null) : null; } const g = await api('/gate'); gateSet = !!g.set; return null; },
+    verify: async h => { if (mode === 'claude') return !!gateHash && h === gateHash; const g = await api('/gate', { method:'POST', body: JSON.stringify({ verify: h }) }); return !!g.ok; },
+    setGate: h => mode === 'claude' ? db.doc('config/gate').set({ hash: h, updatedAt: new Date().toISOString() }) : api('/gate', { method:'POST', body: JSON.stringify({ set: h }) }),
+  };
   let entries = [], unsub = null, dbReady = false, readOnly = false;
 
   // ---------- build form ----------
@@ -386,30 +406,34 @@
     const log = which === 'log';
     if (!log && !(unlocked || isAdmin)) { openGate(); return; }
     $('#view-log').hidden = !log; $('#view-sum').hidden = log;
-    if (!log) { subscribe(); renderSummary(); $('#lockmsg').textContent = isAdmin ? 'You see this as an editor of the page.' : ''; }
+    if (!log) { subscribe(); renderSummary(); $('#lockmsg').textContent = (mode === 'claude' && isAdmin) ? 'You see this as an editor of the page.' : ''; }
     window.scrollTo({ top: 0 });
   }
   $('#b-back').onclick = () => show('log');
-  $('#b-lock').onclick = () => { unlocked = false; try { sessionStorage.removeItem(GATE_KEY); } catch(e){} $('#gear').dataset.unlocked = 'false'; show('log'); toast('Results locked.'); };
+  $('#b-lock').onclick = () => { unlocked = false; if (mode === 'rest') { isAdmin = false; entries = []; } try { sessionStorage.removeItem(GATE_KEY); } catch(e){} $('#gear').dataset.unlocked = 'false'; show('log'); toast('Results locked.'); };
+  const hasGate = () => mode === 'claude' ? !!gateHash : gateSet;
   async function loadGate(){
-    if (!db) { gateLoaded = true; return; }
-    try { const snap = await db.doc('config/gate').get(); gateHash = snap.exists ? (snap.data().hash || null) : null; } catch(e){}
+    if (mode === 'preview') { gateLoaded = true; return; }
+    try { gateHash = await store.getGate(); } catch(e){}
     gateLoaded = true;
-    try { const u = sessionStorage.getItem(GATE_KEY); if (u && gateHash && u === gateHash) { unlocked = true; $('#gear').dataset.unlocked = 'true'; } } catch(e){}
+    try { const u = sessionStorage.getItem(GATE_KEY); if (u && hasGate() && (mode === 'claude' ? u === gateHash : await store.verify(u))) { unlocked = true; if (mode === 'rest') isAdmin = true; $('#gear').dataset.unlocked = 'true'; } } catch(e){}
   }
   const gate = $('#gate');
   function openGate(){
     $('#gate-err').textContent = ''; $('#gate-pw').value = ''; $('#gate-new').value = '';
     const admin = !!isAdmin;
-    $('#gate-admin').hidden = !admin;
-    $('#gate-pw-field').hidden = admin;
+    const firstSetup = mode === 'rest' && !hasGate() && gateLoaded; // nobody has set a password yet: whoever is here sets it
+    $('#gate-admin').hidden = !(admin || firstSetup);
+    $('#gate-pw-field').hidden = admin || firstSetup;
     $('#gate-open').textContent = admin ? 'Open team averages' : 'Unlock';
-    if (!db) { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = 'Team results need a signed-in POS360 Claude account. Open the page from its claude.ai link.'; $('#gate-pw-field').hidden = true; $('#gate-open').hidden = true; }
-    else if (admin) { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = gateHash ? 'Installers unlock the averages with the results password. You can change it here.' : 'No results password is set yet, so only page editors can open the averages. Set one below to let installers in.'; $('#gate-admin-title').textContent = gateHash ? 'Change the results password' : 'Set the results password'; $('#gate-open').hidden = false; }
-    else if (!gateHash) { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = gateLoaded ? 'The team averages are not open yet. Ask Nate for the results password once it is set.' : 'Loading…'; $('#gate-pw-field').hidden = true; $('#gate-open').hidden = true; }
-    else { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = 'Enter the results password to see the team averages.'; $('#gate-open').hidden = false; }
+    $('#gate-title').textContent = 'Team results';
+    if (mode === 'preview') { $('#gate-text').textContent = window.__storageError ? 'Storage is not connected on this host yet. Attach the Neon database in Vercel and redeploy.' : 'Team results are not available on this copy of the page.'; $('#gate-pw-field').hidden = true; $('#gate-open').hidden = true; $('#gate-admin').hidden = true; }
+    else if (admin) { $('#gate-text').textContent = hasGate() ? 'Installers unlock the averages with the results password. You can change it here.' : 'No results password is set yet. Set one below to let installers in.'; $('#gate-admin-title').textContent = hasGate() ? 'Change the results password' : 'Set the results password'; $('#gate-open').hidden = false; }
+    else if (firstSetup) { $('#gate-text').textContent = 'No results password is set yet. Set one now; whoever knows it can open the team averages.'; $('#gate-admin-title').textContent = 'Set the results password'; $('#gate-open').hidden = true; }
+    else if (!hasGate()) { $('#gate-text').textContent = gateLoaded ? 'The team averages are not open yet. Ask Nate for the results password once it is set.' : 'Loading…'; $('#gate-pw-field').hidden = true; $('#gate-open').hidden = true; }
+    else { $('#gate-text').textContent = 'Enter the results password to see the team averages.'; $('#gate-open').hidden = false; }
     if (typeof gate.showModal === 'function') gate.showModal(); else gate.setAttribute('open','');
-    if (!admin && gateHash) setTimeout(() => $('#gate-pw').focus(), 30);
+    if (!admin && !firstSetup && hasGate()) setTimeout(() => $('#gate-pw').focus(), 30);
   }
   function closeGate(){ if (gate.open) gate.close(); else gate.removeAttribute('open'); }
   $('#gate-cancel').onclick = closeGate;
@@ -418,15 +442,16 @@
     if (isAdmin) { closeGate(); show('sum'); return; }
     const pw = $('#gate-pw').value; if (!pw) { $('#gate-err').textContent = 'Type the password first.'; return; }
     const h = await sha(pw);
-    if (gateHash && h === gateHash) { unlocked = true; try { sessionStorage.setItem(GATE_KEY, h); } catch(e){} $('#gear').dataset.unlocked = 'true'; closeGate(); show('sum'); }
+    let ok = false; try { ok = await store.verify(h); } catch(e){ $('#gate-err').textContent = 'Could not check the password right now.'; return; }
+    if (ok) { unlocked = true; if (mode === 'rest') isAdmin = true; try { sessionStorage.setItem(GATE_KEY, h); } catch(e){} $('#gear').dataset.unlocked = 'true'; closeGate(); show('sum'); }
     else { $('#gate-err').textContent = 'That password did not match.'; $('#gate-pw').select(); }
   };
   $('#gate-set').onclick = async () => {
     const pw = $('#gate-new').value.trim();
     if (pw.length < 4) { $('#gate-err').textContent = 'Use at least 4 characters.'; return; }
-    if (!db) return;
+    if (mode === 'preview') return;
     const btn = $('#gate-set'); btn.disabled = true;
-    try { const h = await sha(pw); await db.doc('config/gate').set({ hash: h, updatedAt: new Date().toISOString() }); gateHash = h; $('#gate-err').textContent = ''; $('#gate-new').value = ''; toast('Results password saved. Share it with installers who should see the averages.'); openGate(); }
+    try { const h = await sha(pw); await store.setGate(h); if (mode === 'claude') gateHash = h; else { gateSet = true; unlocked = true; isAdmin = true; try { sessionStorage.setItem(GATE_KEY, h); } catch(e){} $('#gear').dataset.unlocked = 'true'; } $('#gate-err').textContent = ''; $('#gate-new').value = ''; toast('Results password saved. Share it with installers who should see the averages.'); openGate(); }
     catch(e){ $('#gate-err').textContent = 'Could not save the password right now.'; }
     finally { btn.disabled = false; }
   };
@@ -453,10 +478,11 @@
     const f = readForm();
     if (!f.name) { toast('Add your name first so the team knows whose numbers these are.'); $('#m-name').focus(); return; }
     if (Object.keys(f.minutes).length < 5) { toast('Fill in at least a handful of steps before saving.'); return; }
-    if (!db) { toast('Saving needs a signed-in POS360 Claude account. Your numbers are kept on this device.'); return; }
+    if (mode === 'preview') { toast(window.__storageError ? 'Storage is not connected on this host yet. Your numbers are kept on this device.' : 'Saving is not available on this copy of the page. Your numbers are kept on this device.'); return; }
     const btn = $('#b-save'); btn.disabled = true; $('#status').textContent = 'Saving…';
     try {
-      await db.collection('studies').add({ ...f, uid: uid || null, createdAt: new Date().toISOString(), v: 1 });
+      await store.add({ ...f, uid: uid || null, createdAt: new Date().toISOString(), v: 1 });
+      if (mode === 'rest' && (unlocked || isAdmin)) refresh();
       $('#status').textContent = ''; toast('Saved. Thank you, your study is in the team data.');
       if (unlocked || isAdmin) show('sum');
     } catch(e) {
@@ -475,7 +501,15 @@
   ].map(e => { let h=0,w=0; STEPS.forEach(s => { const m=e.minutes[s.id]||0; if (s.type==='wait') w+=m; else h+=m; }); return {...e, hands:h, wait:w, total:h+w, notes:{}, date:'', example:true}; });
   let showExamples = false;
 
+  async function refresh(){
+    if (mode !== 'rest' || !(unlocked || isAdmin)) return;
+    try { const rows = await store.list(); entries = Array.isArray(rows) ? rows : []; dbReady = true; }
+    catch(e){ dbReady = true; if (e.code === 'locked') { unlocked = false; isAdmin = false; try { sessionStorage.removeItem(GATE_KEY); } catch(x){} $('#gear').dataset.unlocked = 'false'; } }
+    if (!$('#view-sum').hidden) renderSummary();
+    $('#sum-sub').textContent = entries.length ? `One station, one location. ${entries.length} saved ${entries.length===1?'study':'studies'}, averaged per step.` : 'One station, one location. Every saved study, averaged per step.';
+  }
   function subscribe(){
+    if (mode === 'rest') { refresh(); return; }
     if (unsub || !db) return;
     try {
       unsub = db.collection('studies').orderBy('createdAt','desc').limit(1000).onSnapshot(snap => {
@@ -550,9 +584,9 @@
       </div>`;
     body.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       if (!confirm('Remove this study from the team data?')) return;
-      try { await db.doc('studies/' + b.dataset.del).delete(); toast('Removed.'); } catch(e){ toast('Could not remove it right now.'); }
+      try { await store.remove(b.dataset.del); toast('Removed.'); if (mode === 'rest') refresh(); } catch(e){ toast('Could not remove it right now.'); }
     });
-    $('#b-export').hidden = !(downloads && entries.length && !usingExamples);
+    $('#b-export').hidden = !((downloads || mode === 'rest') && entries.length && !usingExamples);
   }
   $('#f-exp').onchange = renderSummary;
 
@@ -567,19 +601,32 @@
     await copy(lines.join('\n'));
   };
   $('#b-export').onclick = async () => {
-    if (!downloads) return;
+    if (!downloads && mode !== 'rest') return;
     const head = ['Date','Installer','Installs completed','Store type','Total min','Hands-on min','Waiting min', ...STEPS.map(s => s.name), ...STEPS.map(s => 'Note: ' + s.name)];
     const rows = entries.map(e => [e.date, e.name, e.exp, e.store, e.total, e.hands, e.wait, ...STEPS.map(s => e.minutes?.[s.id] ?? ''), ...STEPS.map(s => e.notes?.[s.id] ?? '')]);
     const csv = [head, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
-    try { await downloads.save({ filename: `360pro-time-studies-${new Date().toISOString().slice(0,10)}.csv`, data: csv }); } catch(e){ if (!(e && e.code === 'cancelled')) toast('The download did not go through.'); }
+    const filename = `360pro-time-studies-${new Date().toISOString().slice(0,10)}.csv`;
+    if (downloads) { try { await downloads.save({ filename, data: csv }); } catch(e){ if (!(e && e.code === 'cancelled')) toast('The download did not go through.'); } return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' })); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
   };
 
   // ---------- resolve capabilities after first paint ----------
   (async () => {
     if (!window.claude || typeof window.claude.use !== 'function') {
-      notice('<div><b>Preview mode.</b> Open this page from its claude.ai link, signed in to your POS360 account, to save studies.</div>');
+      // Not inside the claude.ai runtime: look for this repo's API on the same host.
+      if (location.protocol === 'http:' || location.protocol === 'https:') {
+        try {
+          const r = await fetch(API + '/gate', { cache:'no-store' });
+          if (r.ok) { mode = 'rest'; const g = await r.json(); gateSet = !!g.set; gateLoaded = true;
+            try { const u = sessionStorage.getItem(GATE_KEY); if (u && gateSet && await store.verify(u)) { unlocked = true; isAdmin = true; $('#gear').dataset.unlocked = 'true'; } } catch(e){}
+            return; }
+          if (r.status >= 500) { window.__storageError = true; notice('<div><b>Storage is not connected yet.</b> The page works, but saving needs the Neon database attached to this Vercel project. Your numbers stay on this device meanwhile.</div>'); dbReady = true; return; }
+        } catch(e){}
+      }
+      notice('<div><b>Preview mode.</b> Totals and the Slack summary work here. Saving and team averages need the hosted version.</div>');
       dbReady = true; return;
     }
+    mode = 'claude';
     const [d, u, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]);
     db = d; user = u; downloads = dl;
     if (user) { try { [uid, canWrite, isAdmin] = await Promise.all([user.id(), user.can('data.write'), user.canEdit()]); const me = await user.me(); if (me.name) $('#who').textContent = me.name; if (me.name && !$('#m-name').value) $('#m-name').value = me.name; } catch(e){} }

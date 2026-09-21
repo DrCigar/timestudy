@@ -4,9 +4,9 @@ import fs from 'fs';
 const dir = process.cwd();
 const logo = 'data:image/png;base64,' + fs.readFileSync(dir + '/logo.png').toString('base64');
 fs.mkdirSync(dir + '/dist', { recursive: true });
-for (const name of ['artifact.html', 'sheet.html']) {
+for (const name of ['app.html', 'sheet.html']) {
   const html = fs.readFileSync(`${dir}/src/${name}`, 'utf8').split('{{LOGO}}').join(logo);
   fs.writeFileSync(`${dir}/dist/${name}`, html);
   console.log('built dist/' + name, html.length);
-  if (name === 'sheet.html') { fs.writeFileSync(dir + '/index.html', html); console.log('built index.html (root copy of the sheet for static hosting)'); }
+  if (name === 'app.html') { fs.writeFileSync(dir + '/index.html', html); console.log('built index.html (root copy of the app for Vercel)'); }
 }
