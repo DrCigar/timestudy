@@ -181,6 +181,20 @@
   .empty h3{ font-size:20px; font-weight:800; margin-bottom:6px; }
   .empty p{ color:var(--muted); max-width:52ch; margin:0 auto 14px; }
   .pill{ display:inline-block; font-size:11px; letter-spacing:.10em; text-transform:uppercase; font-weight:700; padding:3px 8px; border-radius:2px; background:var(--verm-soft); color:var(--verm); vertical-align:middle; margin-left:8px; }
+  dialog.thanks{ border:0; border-top:6px solid var(--verm); background:var(--surface); color:var(--text); padding:36px 32px 28px; width:min(520px, calc(100vw - 32px)); border-radius:4px; text-align:center; box-shadow:0 24px 80px rgba(0,0,0,.5); }
+  dialog.thanks::backdrop{ background:rgba(0,0,0,.65); }
+  dialog.thanks .check{ width:84px; height:84px; border-radius:50%; background:var(--verm); color:#fff; display:inline-flex; align-items:center; justify-content:center; margin-bottom:18px; }
+  dialog.thanks .check svg{ width:44px; height:44px; }
+  dialog.thanks h2{ font-size:34px; font-weight:800; letter-spacing:-.02em; line-height:1.05; margin-bottom:10px; text-wrap:balance; }
+  dialog.thanks p{ font-size:16px; color:var(--muted); max-width:38ch; margin:0 auto; }
+  dialog.thanks .sum{ margin:22px auto 0; display:inline-grid; grid-template-columns:auto auto auto; gap:0 28px; text-align:center; }
+  dialog.thanks .sum b{ display:block; font-size:22px; font-weight:800; letter-spacing:-.01em; }
+  dialog.thanks .sum span{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--muted); }
+  dialog.thanks .btns{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:26px; }
+  .locked .row input, .locked .meta input, .locked .meta select{ opacity:.7; }
+  .locked .row input:focus, .locked .meta input:focus{ border-color:var(--line); box-shadow:none; }
+  .btn.done{ background:var(--surface2); border-color:var(--line); color:var(--muted); cursor:default; }
+  @media (prefers-reduced-motion:no-preference){ dialog.thanks[open] .check{ animation:pop .45s cubic-bezier(.2,1.4,.4,1) both; } @keyframes pop{ from{ transform:scale(.4); opacity:0; } to{ transform:scale(1); opacity:1; } } }
   .toast{ position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-left:4px solid var(--verm); font-size:14px; border-radius:3px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:9; }
   .toast.show{ opacity:1; }
   footer{ max-width:1040px; margin:0 auto; padding:0 20px 30px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -229,6 +243,7 @@
 
     <div class="actions">
       <button class="btn primary" id="b-save">Save to team data</button>
+      <button class="btn" id="b-new" hidden>Start a new study</button>
       <button class="btn" id="b-copy">Copy summary for Slack</button>
       <button class="btn" id="b-reset">Clear</button>
       <span class="status" id="status"></span>
@@ -255,6 +270,13 @@
   <span>Pairs with the 360 Pro quick install card. Post summaries to the Deployments Slack channel.</span>
   <span>POS360 · <b>SYSTEMS MADE SIMPLE</b></span>
 </footer>
+<dialog class="thanks" id="thanks">
+  <div class="check" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg></div>
+  <h2 id="thanks-title">Thank you</h2>
+  <p>Your study is in the team data. Every number you entered helps set a real baseline for how long a 360 Pro install takes.</p>
+  <div class="sum num"><div><b id="th-total">0 min</b><span>On site</span></div><div><b id="th-hands">0 min</b><span>Hands-on</span></div><div><b id="th-wait">0 min</b><span>Waiting</span></div></div>
+  <div class="btns"><button class="btn primary" type="button" id="th-close">Done</button><button class="btn" type="button" id="th-new">Start a new study</button></div>
+</dialog>
 <dialog class="gate" id="gate">
   <form method="dialog" id="gate-form">
     <h3 id="gate-title">Team results</h3>
@@ -401,6 +423,34 @@
   $('#view-log').addEventListener('input', () => { compute(); clearTimeout(saveT); saveT = setTimeout(saveDraft, 300); });
   compute();
 
+  // ---------- submitted state: one save per study ----------
+  const SUBMITTED = 'pos360-ts-submitted-v1';
+  let submitting = false, submitted = null;
+  try { submitted = JSON.parse(localStorage.getItem(SUBMITTED) || 'null'); } catch(e){ submitted = null; }
+  function lockForm(on){
+    $('#view-log').classList.toggle('locked', !!on);
+    document.querySelectorAll('#view-log .row input, #view-log .meta input').forEach(i => i.readOnly = !!on);
+    document.querySelectorAll('#view-log .meta select').forEach(i => i.disabled = !!on);
+    const save = $('#b-save'); save.disabled = !!on; save.textContent = on ? 'Submitted ✓' : 'Save to team data'; save.classList.toggle('done', !!on);
+    $('#b-new').hidden = !on; $('#b-reset').hidden = !!on;
+    if (on && submitted) notice(`<div><b>This study was submitted${submitted.at ? ' on ' + new Date(submitted.at).toLocaleDateString() : ''}.</b> It is already in the team data, so it cannot be saved again. Use "Start a new study" to enter a different set of numbers.</div>`, true);
+  }
+  function startNew(){
+    submitted = null; try { localStorage.removeItem(SUBMITTED); } catch(e){}
+    document.querySelectorAll('#view-log .row input').forEach(i => i.value = '');
+    $('#m-date').value = new Date().toISOString().slice(0,10);
+    lockForm(false); notice(''); compute(); saveDraft(); window.scrollTo({ top: 0 }); $('#m-name').focus();
+  }
+  $('#b-new').onclick = () => { if (confirm('Start a new study? The numbers on this form will be cleared.')) startNew(); };
+  $('#th-new').onclick = () => { $('#thanks').close(); startNew(); };
+  $('#th-close').onclick = () => $('#thanks').close();
+  function showThanks(f){
+    $('#thanks-title').textContent = f.name ? `Thank you, ${f.name.split(' ')[0]}` : 'Thank you';
+    $('#th-total').textContent = fmt(f.total); $('#th-hands').textContent = fmt(f.hands); $('#th-wait').textContent = fmt(f.wait);
+    const d = $('#thanks'); if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open','');
+  }
+  if (submitted) lockForm(true);
+
   // ---------- views + password gate ----------
   const GATE_KEY = 'pos360-ts-unlock';
   let gateHash = null, gateLoaded = false, unlocked = false;
@@ -478,22 +528,24 @@
   async function copy(text){ try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into the Deployments Slack channel.'); } catch(e){ prompt('Copy this summary:', text); } }
 
   $('#b-save').onclick = async () => {
+    if (submitting || submitted) return;
     const f = readForm();
     if (!f.name) { toast('Add your name first so the team knows whose numbers these are.'); $('#m-name').focus(); return; }
     if (Object.keys(f.minutes).length < 5) { toast('Fill in at least a handful of steps before saving.'); return; }
     if (mode === 'preview') { toast(window.__storageError ? 'Storage is not connected on this host yet. Your numbers are kept on this device.' : 'Saving is not available on this copy of the page. Your numbers are kept on this device.'); return; }
-    const btn = $('#b-save'); btn.disabled = true; $('#status').textContent = 'Saving…';
+    const btn = $('#b-save'); submitting = true; btn.disabled = true; btn.textContent = 'Saving…'; $('#status').textContent = '';
     try {
       await store.add({ ...f, uid: uid || null, createdAt: new Date().toISOString(), v: 1 });
       if (mode === 'rest' && (unlocked || isAdmin)) refresh();
-      $('#status').textContent = ''; toast('Saved. Thank you, your study is in the team data.');
-      if (unlocked || isAdmin) show('sum');
+      submitted = { at: new Date().toISOString(), total: f.total, name: f.name };
+      try { localStorage.setItem(SUBMITTED, JSON.stringify(submitted)); } catch(e){}
+      lockForm(true); showThanks(f);
     } catch(e) {
-      $('#status').textContent = '';
+      btn.textContent = 'Save to team data';
       if (e && e.code === 'invalid_argument') { readOnly = true; notice('<div><b>This account can view the team data but not add to it.</b>Ask Nate for "Can interact" access on this page, then save again. Your numbers are kept on this device meanwhile.</div>'); }
       else if (e && e.code === 'quota_exceeded') { notice('<div><b>The team data store is full.</b>Older studies need to be exported and pruned before new ones can be saved.</div>'); }
       else { toast('Could not save right now. Try again in a moment.'); }
-    } finally { btn.disabled = false; }
+    } finally { submitting = false; if (!submitted) btn.disabled = false; }
   };
 
   // ---------- summary ----------
