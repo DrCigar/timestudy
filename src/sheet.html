@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>360 Pro install time study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{ --black:#000; --ink:#0F0F0F; --verm:#EF4023; --gray:#EBEBEB; --gray2:#F5F5F5; --mid:#6B6B6B; --line:#D9D9D9; --wait:#7A7A7A; }
+  @page{ size:Letter; margin:0; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ background:#E4E4E4; color:var(--ink); font-family:'Figtree',Calibri,sans-serif; font-weight:300; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  b{ font-weight:700; }
+  button{ font-family:inherit; }
+
+  .page{ position:relative; width:8.5in; min-height:11in; margin:.3in auto; background:#fff; padding:0 .42in .30in .56in; display:flex; flex-direction:column; box-shadow:0 4px 24px rgba(0,0,0,.12); }
+  .rail{ position:absolute; left:0; top:0; bottom:0; width:.14in; background:var(--verm); }
+
+  /* header */
+  .hdr{ background:var(--black); color:#fff; margin:0 -.42in 0 -.56in; padding:.16in .42in .16in .56in; display:flex; align-items:center; gap:.28in; }
+  .hdr img{ height:.46in; width:auto; display:block; }
+  .hdr h1{ flex:1; font-size:19.5pt; font-weight:800; letter-spacing:-.01em; line-height:1; white-space:nowrap; }
+  .hdr h1 span{ color:var(--verm); }
+  .hdr .tag{ text-align:right; border-left:1px solid #333; padding-left:.24in; white-space:nowrap; }
+  .hdr .tag .lbl{ font-size:6.6pt; letter-spacing:.18em; text-transform:uppercase; color:#BDBDBD; font-weight:600; }
+  .hdr .tag .val{ font-size:14pt; font-weight:800; line-height:1.1; margin-top:.03in; }
+  .hdr .tag .val span{ color:var(--verm); }
+
+  /* intro + meta */
+  .intro{ margin-top:.16in; display:grid; grid-template-columns:1fr 3.3in; gap:.20in; align-items:stretch; }
+  .intro p{ font-size:9.2pt; line-height:1.4; color:#333; }
+  .intro p b{ color:var(--ink); }
+  .meta{ display:grid; grid-template-columns:1fr 1fr; gap:.08in .12in; }
+  .meta label{ display:block; font-size:6.6pt; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:var(--mid); margin-bottom:.03in; }
+  .meta input,.meta select{ width:100%; font:inherit; font-size:9.5pt; font-weight:400; color:var(--ink); border:0; border-bottom:1.5px solid var(--ink); background:transparent; padding:.03in 0; outline:none; }
+  .meta input:focus{ border-bottom-color:var(--verm); }
+  .meta select{ appearance:none; -webkit-appearance:none; }
+
+  /* legend */
+  .legend{ margin-top:.14in; display:flex; gap:.22in; align-items:center; font-size:7.8pt; color:#333; }
+  .legend .sw{ display:inline-block; width:.14in; height:.14in; border-radius:2px; vertical-align:-.02in; margin-right:.05in; }
+  .legend .sw.hands{ background:var(--verm); } .legend .sw.wait{ background:var(--wait); }
+
+  /* phases */
+  .phase{ margin-top:.14in; }
+  .phase-h{ display:grid; grid-template-columns:1fr .9in 2.2in; align-items:baseline; gap:.14in; border-bottom:2px solid var(--ink); padding-bottom:.04in; }
+  .phase-h h2{ font-size:11.5pt; font-weight:800; letter-spacing:-.01em; }
+  .phase-h h2 span{ color:var(--verm); font-weight:800; margin-right:.06in; }
+  .phase-h .col{ font-size:6.6pt; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:var(--mid); }
+  .row{ display:grid; grid-template-columns:1fr .9in 2.2in; gap:.14in; align-items:center; padding:.055in 0; border-bottom:1px solid var(--line); }
+  .row:nth-child(even){ background:var(--gray2); margin:0 -.08in; padding-left:.08in; padding-right:.08in; }
+  .row .name{ font-size:9pt; line-height:1.3; display:flex; align-items:center; gap:.08in; }
+  .row .name .k{ flex:none; width:.20in; height:.20in; border-radius:2px; background:var(--verm); }
+  .row.wait .name .k{ background:var(--wait); }
+  .row .name .k::after{ content:""; }
+  .row .name small{ display:block; font-size:7.4pt; color:var(--mid); line-height:1.25; }
+  .row input{ font:inherit; font-weight:600; color:var(--ink); background:#fff; border:1px solid #B5B5B5; border-radius:2px; padding:.04in .06in; outline:none; width:100%; }
+  .row input:focus{ border-color:var(--verm); box-shadow:0 0 0 2px rgba(239,64,35,.15); }
+  .row input.min{ text-align:right; font-size:10pt; }
+  .row input.note{ font-weight:300; font-size:8.6pt; }
+  .row input::placeholder{ color:#B5B5B5; font-weight:300; }
+  .sub{ display:grid; grid-template-columns:1fr .9in 2.2in; gap:.14in; padding:.05in 0 0; font-size:7.6pt; color:var(--mid); }
+  .sub .v{ text-align:right; font-weight:700; color:var(--ink); font-size:8.6pt; }
+
+  /* totals */
+  .totals{ margin-top:.20in; display:grid; grid-template-columns:2.4in 1fr; gap:.18in; align-items:stretch; }
+  .big{ background:var(--ink); color:#fff; border-top:3px solid var(--verm); padding:.14in .16in .16in; display:flex; flex-direction:column; justify-content:center; }
+  .big .lbl{ font-size:6.6pt; letter-spacing:.16em; text-transform:uppercase; color:#BDBDBD; font-weight:700; }
+  .big .num{ font-size:28pt; font-weight:800; line-height:1; margin-top:.05in; letter-spacing:-.02em; }
+  .big .num small{ font-size:11pt; font-weight:600; color:#BDBDBD; margin-left:.06in; letter-spacing:0; }
+  .big .split{ margin-top:.10in; display:flex; gap:.18in; font-size:8.4pt; color:#CFCFCF; }
+  .big .split b{ color:#fff; }
+  .bars{ background:var(--gray2); border-top:3px solid var(--verm); padding:.12in .14in .14in; }
+  .bars h4{ font-size:6.6pt; letter-spacing:.16em; text-transform:uppercase; font-weight:700; margin-bottom:.08in; }
+  .bar{ display:grid; grid-template-columns:1.25in 1fr .55in; gap:.10in; align-items:center; font-size:8.2pt; margin-top:.045in; }
+  .bar .trk{ height:.16in; background:#fff; border:1px solid var(--line); border-radius:2px; overflow:hidden; display:flex; }
+  .bar .fh{ background:var(--verm); height:100%; } .bar .fw{ background:var(--wait); height:100%; }
+  .bar .v{ text-align:right; font-weight:700; }
+
+  /* actions */
+  .actions{ margin-top:.18in; display:flex; gap:.10in; flex-wrap:wrap; align-items:center; }
+  .btn{ font-size:8.6pt; font-weight:700; letter-spacing:.02em; padding:.08in .16in; border:1.5px solid var(--ink); background:#fff; color:var(--ink); border-radius:2px; cursor:pointer; }
+  .btn.primary{ background:var(--verm); border-color:var(--verm); color:#fff; }
+  .btn:hover{ filter:brightness(.95); }
+  .saved{ font-size:7.8pt; color:var(--mid); margin-left:auto; }
+
+  .foot{ margin-top:auto; padding-top:.16in; display:flex; justify-content:space-between; font-size:7pt; color:var(--mid); letter-spacing:.02em; }
+  .foot b{ color:var(--ink); font-weight:600; }
+
+  /* print: paper form */
+  @media print{
+    html,body{ background:#fff; }
+    .page{ margin:0; box-shadow:none; height:11in; min-height:0; overflow:hidden; padding-bottom:.24in; }
+    .actions,.saved,.bars,.intro p{ display:none !important; }
+    .intro{ grid-template-columns:1fr; margin-top:.10in; }
+    .meta{ grid-template-columns:repeat(4,1fr); }
+    .legend{ margin-top:.08in; }
+    .phase{ margin-top:.035in; page-break-inside:avoid; }
+    .phase-h{ padding-bottom:.03in; }
+    .phase-h h2{ font-size:9.5pt; }
+    .row{ padding:.014in 0; }
+    .row .name{ font-size:8.2pt; }
+    .row .name small{ display:none; }
+    .row .name .k{ width:.14in; height:.14in; }
+    .row input{ border:0; border-bottom:1px solid #999; border-radius:0; background:transparent; padding:0 .04in; font-size:8pt; line-height:1.3; }
+    .row input::placeholder{ color:transparent; }
+    .row:nth-child(even){ background:var(--gray2); }
+    .sub{ padding-top:.012in; font-size:7pt; }
+    .meta input,.meta select{ border-bottom:1px solid #999; font-size:9pt; }
+    .totals{ margin-top:.10in; grid-template-columns:1fr; }
+    .big{ flex-direction:row; align-items:center; gap:.30in; padding:.08in .16in; }
+    .big .num{ margin-top:0; font-size:17pt; }
+    .big .split{ margin-top:0; margin-left:auto; }
+    .foot{ padding-top:.10in; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="rail"></div>
+
+  <header class="hdr">
+    <img src="{{LOGO}}" alt="POS360">
+    <h1>360 Pro install <span>time study</span></h1>
+    <div class="tag"><div class="lbl">Scope</div><div class="val">1 station<span>,</span> 1 location</div></div>
+  </header>
+
+  <section class="intro">
+    <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time you spend waiting on someone else or handling interruptions. Totals update as you type, and the sheet remembers your numbers on this device.</p>
+    <div class="meta">
+      <div><label for="m-name">Installer</label><input id="m-name" data-key="name" placeholder="Your name"></div>
+      <div><label for="m-date">Date</label><input id="m-date" data-key="date" type="date"></div>
+      <div><label for="m-exp">Installs completed</label>
+        <select id="m-exp" data-key="exp"><option value="">Choose</option><option>1 to 5</option><option>6 to 20</option><option>21 to 50</option><option>50 or more</option></select></div>
+      <div><label for="m-store">Typical store type</label><input id="m-store" data-key="store" placeholder="Liquor, convenience, smoke shop"></div>
+    </div>
+  </section>
+
+  <div class="legend"><span><i class="sw hands"></i>Hands-on time</span><span><i class="sw wait"></i>Waiting or interrupted</span><span style="margin-left:auto;color:var(--mid)">Minutes, whole numbers are fine</span></div>
+
+  <div id="phases"></div>
+
+  <section class="totals">
+    <div class="big">
+      <div class="lbl">Typical time on site, one station</div>
+      <div class="num"><span id="t-hours">0</span><small>hr</small><span id="t-mins" style="margin-left:.10in">0</span><small>min</small></div>
+      <div class="split"><span>Hands-on <b id="t-hands">0 min</b></span><span>Waiting <b id="t-wait">0 min</b></span></div>
+    </div>
+    <div class="bars">
+      <h4>Where the time goes</h4>
+      <div id="bars"></div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn primary" id="b-copy">Copy summary for Slack</button>
+    <button class="btn" id="b-print">Print or save as PDF</button>
+    <button class="btn" id="b-csv">Download CSV</button>
+    <button class="btn" id="b-reset">Clear</button>
+    <span class="saved" id="saved"></span>
+  </div>
+
+  <footer class="foot">
+    <span><b>Install time study</b> · pairs with the 360 Pro quick install card · post your summary to the Deployments Slack channel</span>
+    <span>POS360 · <b>SYSTEMS MADE SIMPLE</b></span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  // Steps mirror the quick install card. type: 'hands' or 'wait'.
+  const PHASES = [
+    { id:'arrive', n:'0', title:'Arrive and document', steps:[
+      { id:'checkin', name:'Check in and walk the site', sub:'Meet the manager, ask permission to shoot' },
+      { id:'photos',  name:'Photos and video', sub:'Storefront, six angles of the old register setup' },
+      { id:'unbox',   name:'Unbox and stage', sub:'Clear the counter, match the small box to its register' },
+    ]},
+    { id:'wire', n:'1–8', title:'Wire it', steps:[
+      { id:'brain',   name:'1 · Place the Brain', sub:'Move the old register aside, keep it selling' },
+      { id:'ups',     name:'2 · Power the battery backup' },
+      { id:'wake',    name:'3 · Wake the Brain', sub:'Power, switch, boot, blue WAN cable' },
+      { id:'printer', name:'4 · Connect the receipt printer' },
+      { id:'term',    name:'5 · Mount the card terminal', sub:'Includes agreeing the spot with the merchant' },
+      { id:'lcd',     name:'6 · Mount the customer display' },
+      { id:'periph',  name:'7 · Scanners and label printers' },
+      { id:'cables',  name:'8 · Tidy the cables', sub:'Velcro, cable cover' },
+      { id:'isp',     name:'Wait for online confirmation', sub:'Tech confirms store ISP and LTE', type:'wait' },
+    ]},
+    { id:'data', n:'', title:'Data transfer', steps:[
+      { id:'pull',    name:'Data pull from the old register', sub:'Data Transfer Team works the old system', type:'wait' },
+      { id:'convert', name:'Data conversion', sub:'Waiting for the converted database to land', type:'wait' },
+    ]},
+    { id:'test', n:'', title:'Prove it works', steps:[
+      { id:'scan',    name:'Scan 20 items and check pricing' },
+      { id:'sale',    name:'One-cent sale, void, label print' },
+      { id:'lte',     name:'Backup internet test', sub:'ISP check with the Data team, unplug, sale, replug' },
+      { id:'fixes',   name:'Fix anything that failed', sub:'Pricing corrections, hardware swaps, callbacks' },
+    ]},
+    { id:'live', n:'', title:'Go live', steps:[
+      { id:'batch',   name:'Merchant batches the old terminal', sub:'Reports run before anything is unplugged', type:'wait' },
+      { id:'switch',  name:'Switch to live and remove the old hardware' },
+    ]},
+    { id:'close', n:'', title:'Close out', steps:[
+      { id:'walk',    name:'Walk the merchant through the setup' },
+      { id:'qc',      name:'Digital QC Sheet, photos, Slack posts' },
+      { id:'notes',   name:'Check out and closeout notes' },
+    ]},
+    { id:'misc', n:'', title:'Miscellaneous, across the visit', steps:[
+      { id:'traffic', name:'Customer traffic', sub:'Stepping aside so the merchant can ring sales', type:'wait' },
+      { id:'mxq',     name:'Merchant questions', sub:'Conversations, demos, and explaining what comes next', type:'wait' },
+      { id:'other',   name:'Other interruptions', sub:'Deliveries, phone calls, anything else that stopped the clock', type:'wait' },
+    ]},
+  ];
+  const KEY = 'pos360-time-study-v1';
+  const $ = s => document.querySelector(s);
+  let state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(e){ state = {}; }
+
+  // Build rows
+  const host = $('#phases');
+  PHASES.forEach(ph => {
+    const sec = document.createElement('section'); sec.className = 'phase';
+    sec.innerHTML = `<div class="phase-h"><h2>${ph.n ? `<span>${ph.n}</span>` : ''}${ph.title}</h2><div class="col" style="text-align:right">Minutes</div><div class="col">Notes, what makes it slow</div></div>`;
+    ph.steps.forEach(st => {
+      const row = document.createElement('div'); row.className = 'row' + (st.type === 'wait' ? ' wait' : '');
+      row.innerHTML = `<div class="name"><i class="k" title="${st.type==='wait'?'Waiting':'Hands-on'}"></i><div>${st.name}${st.sub ? `<small>${st.sub}</small>` : ''}</div></div>
+        <input class="min" type="number" min="0" step="1" inputmode="numeric" placeholder="0" data-min="${st.id}" aria-label="Minutes for ${st.name}">
+        <input class="note" type="text" placeholder="Optional" data-note="${st.id}" aria-label="Notes for ${st.name}">`;
+      sec.appendChild(row);
+    });
+    const sub = document.createElement('div'); sub.className = 'sub';
+    sub.innerHTML = `<div>Phase total</div><div class="v" data-sub="${ph.id}">0 min</div><div></div>`;
+    sec.appendChild(sub);
+    host.appendChild(sec);
+  });
+
+  // Restore
+  document.querySelectorAll('[data-min]').forEach(i => { const v = state.min?.[i.dataset.min]; if (v != null && v !== '') i.value = v; });
+  document.querySelectorAll('[data-note]').forEach(i => { const v = state.note?.[i.dataset.note]; if (v) i.value = v; });
+  document.querySelectorAll('[data-key]').forEach(i => { const v = state.meta?.[i.dataset.key]; if (v) i.value = v; });
+  if (!$('#m-date').value) $('#m-date').value = new Date().toISOString().slice(0,10);
+
+  function minutesOf(id){ const el = document.querySelector(`[data-min="${id}"]`); const n = parseFloat(el.value); return isNaN(n) || n < 0 ? 0 : n; }
+  function fmt(m){ m = Math.round(m); return m >= 60 ? `${Math.floor(m/60)} hr ${m%60} min` : `${m} min`; }
+
+  function compute(){
+    let hands = 0, wait = 0; const per = [];
+    PHASES.forEach(ph => {
+      let h = 0, w = 0;
+      ph.steps.forEach(st => { const m = minutesOf(st.id); if (st.type === 'wait') w += m; else h += m; });
+      per.push({ title: ph.title, h, w }); hands += h; wait += w;
+      document.querySelector(`[data-sub="${ph.id}"]`).textContent = fmt(h + w);
+    });
+    const total = hands + wait;
+    $('#t-hours').textContent = Math.floor(total/60);
+    $('#t-mins').textContent = Math.round(total % 60);
+    $('#t-hands').textContent = fmt(hands);
+    $('#t-wait').textContent = fmt(wait);
+    const max = Math.max(1, ...per.map(p => p.h + p.w));
+    $('#bars').innerHTML = per.map(p => {
+      const t = p.h + p.w, pct = total ? Math.round(t / total * 100) : 0;
+      return `<div class="bar"><div>${p.title}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v">${pct}%</div></div>`;
+    }).join('');
+    return { hands, wait, total, per };
+  }
+
+  let t;
+  function save(){
+    const s = { min:{}, note:{}, meta:{} };
+    document.querySelectorAll('[data-min]').forEach(i => { if (i.value !== '') s.min[i.dataset.min] = i.value; });
+    document.querySelectorAll('[data-note]').forEach(i => { if (i.value) s.note[i.dataset.note] = i.value; });
+    document.querySelectorAll('[data-key]').forEach(i => { if (i.value) s.meta[i.dataset.key] = i.value; });
+    try { localStorage.setItem(KEY, JSON.stringify(s)); $('#saved').textContent = 'Saved on this device'; clearTimeout(t); t = setTimeout(() => $('#saved').textContent = '', 1800); } catch(e){}
+  }
+  document.addEventListener('input', () => { compute(); save(); });
+  compute();
+
+  // Actions
+  $('#b-print').onclick = () => window.print();
+  $('#b-reset').onclick = () => { if (!confirm('Clear every number and note on this sheet?')) return; document.querySelectorAll('.row input').forEach(i => i.value = ''); compute(); save(); };
+  $('#b-copy').onclick = async () => {
+    const r = compute(); const name = $('#m-name').value || 'Installer'; const exp = $('#m-exp').value; const store = $('#m-store').value;
+    const lines = [`*360 Pro install time study* · ${name}${exp ? ` · ${exp} installs` : ''}${store ? ` · ${store}` : ''}`,
+      `Typical time on site, 1 station: *${fmt(r.total)}* (hands-on ${fmt(r.hands)}, waiting ${fmt(r.wait)})`, ''];
+    r.per.forEach(p => { const t = p.h + p.w; if (t) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}`); });
+    const notes = []; document.querySelectorAll('[data-note]').forEach(i => { if (i.value.trim()) { const id = i.dataset.note; const st = PHASES.flatMap(p => p.steps).find(s => s.id === id); notes.push(`• ${st.name}: ${i.value.trim()}`); } });
+    if (notes.length) lines.push('', '*What slows it down*', ...notes);
+    const text = lines.join('\n');
+    try { await navigator.clipboard.writeText(text); flash('Copied. Paste it into the Deployments Slack channel.'); }
+    catch(e){ prompt('Copy this summary:', text); }
+  };
+  $('#b-csv').onclick = () => {
+    const rows = [['Phase','Step','Type','Minutes','Notes']];
+    PHASES.forEach(ph => ph.steps.forEach(st => rows.push([ph.title, st.name.replace(/^\d+ · /,''), st.type === 'wait' ? 'Waiting' : 'Hands-on', minutesOf(st.id), document.querySelector(`[data-note="${st.id}"]`).value])));
+    const r = compute(); rows.push([], ['Total','','', r.total, ''], ['Hands-on','','', r.hands, ''], ['Waiting','','', r.wait, '']);
+    const meta = [['Installer', $('#m-name').value], ['Date', $('#m-date').value], ['Installs completed', $('#m-exp').value], ['Store type', $('#m-store').value], []];
+    const csv = [...meta, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = `360pro-time-study-${($('#m-name').value || 'installer').replace(/\s+/g,'-').toLowerCase()}-${$('#m-date').value || 'undated'}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  function flash(msg){ $('#saved').textContent = msg; clearTimeout(t); t = setTimeout(() => $('#saved').textContent = '', 3500); }
+})();
+</script>
+</body>
+</html>

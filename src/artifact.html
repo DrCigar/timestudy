@@ -1,0 +1,591 @@
+<title>Install Time Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --black:#000; --ink:#0F0F0F; --verm:#EF4023; --verm-soft:rgba(239,64,35,.12);
+    --paper:#FFFFFF; --ground:#EFEFED; --surface:#FFFFFF; --surface2:#F5F5F3; --line:#DDDDD9; --line2:#EBEBEB;
+    --text:#0F0F0F; --muted:#6B6B68; --wait:#7A7A78; --ok:#2FAE4E; --hdr:#000; --hdr-text:#fff; --hdr-muted:#BDBDBD;
+    --focus:0 0 0 3px rgba(239,64,35,.22);
+  }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+    --paper:#1B1B1A; --ground:#111110; --surface:#1B1B1A; --surface2:#232322; --line:#33332F; --line2:#2A2A28;
+    --text:#F2F2EE; --muted:#A3A39E; --wait:#8A8A86; --hdr:#000; --hdr-text:#fff; --hdr-muted:#9A9A9A; --verm-soft:rgba(239,64,35,.20);
+  }}
+  :root[data-theme="dark"]{
+    --paper:#1B1B1A; --ground:#111110; --surface:#1B1B1A; --surface2:#232322; --line:#33332F; --line2:#2A2A28;
+    --text:#F2F2EE; --muted:#A3A39E; --wait:#8A8A86; --hdr:#000; --hdr-text:#fff; --hdr-muted:#9A9A9A; --verm-soft:rgba(239,64,35,.20);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ background:var(--ground); color:var(--text); font-family:'Figtree',Calibri,'Segoe UI',sans-serif; font-weight:300; font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  b,strong{ font-weight:700; }
+  button,input,select{ font-family:inherit; font-size:inherit; color:inherit; }
+  button{ cursor:pointer; }
+  :focus-visible{ outline:none; box-shadow:var(--focus); }
+  .num{ font-variant-numeric:tabular-nums; }
+
+  /* header */
+  .hdr{ background:var(--hdr); color:var(--hdr-text); position:sticky; top:env(safe-area-inset-top,0px); z-index:5; border-bottom:4px solid var(--verm); }
+  .hdr-in{ max-width:1040px; margin:0 auto; padding:14px 20px 0; display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+  .hdr img{ height:34px; width:auto; display:block; }
+  .hdr h1{ font-size:20px; font-weight:800; letter-spacing:-.01em; line-height:1; white-space:nowrap; flex:1; }
+  .hdr h1 span{ color:var(--verm); }
+  .hdr-in{ padding-bottom:14px; }
+  .who{ font-size:12px; color:var(--hdr-muted); white-space:nowrap; margin-left:auto; }
+  .gear{ background:transparent; border:1px solid #333; color:var(--hdr-muted); width:38px; height:38px; border-radius:3px; display:inline-flex; align-items:center; justify-content:center; }
+  .gear:hover{ color:#fff; border-color:#666; }
+  .gear svg{ width:20px; height:20px; }
+  .gear[data-unlocked="true"]{ color:var(--verm); border-color:var(--verm); }
+  @media (max-width:640px){ .hdr h1{ font-size:17px; } .who{ display:none; } }
+  .backbar{ display:flex; gap:12px; align-items:center; margin-bottom:16px; flex-wrap:wrap; }
+  .backbar .btn{ padding:8px 14px; font-size:13px; }
+  .backbar .lockmsg{ font-size:13px; color:var(--muted); }
+  dialog.gate{ border:0; border-top:4px solid var(--verm); background:var(--surface); color:var(--text); padding:22px 24px 20px; width:min(420px, calc(100vw - 32px)); border-radius:3px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  dialog.gate::backdrop{ background:rgba(0,0,0,.55); }
+  dialog.gate h3{ font-size:18px; font-weight:800; letter-spacing:-.01em; margin-bottom:4px; }
+  dialog.gate p{ font-size:13.5px; color:var(--muted); margin-bottom:14px; }
+  dialog.gate .field{ margin-bottom:12px; }
+  dialog.gate input{ width:100%; background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:10px 12px; font-weight:400; font-size:15px; }
+  dialog.gate input:focus{ border-color:var(--verm); }
+  dialog.gate .err{ color:var(--verm); font-size:13px; min-height:18px; margin-top:6px; font-weight:600; }
+  dialog.gate .btns{ display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:6px; }
+  dialog.gate hr{ border:0; border-top:1px solid var(--line2); margin:18px 0 14px; }
+  dialog.gate .admin h4{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--muted); margin-bottom:8px; }
+
+  main{ max-width:1040px; margin:0 auto; padding-block:22px 48px; padding-inline:20px; }
+  .view[hidden]{ display:none; }
+
+  /* notice */
+  .notice{ display:flex; gap:12px; align-items:flex-start; background:var(--surface); border-left:4px solid var(--verm); padding:12px 16px; font-size:14px; margin-bottom:18px; }
+  .notice b{ display:block; }
+  .notice.ok{ border-left-color:var(--ok); }
+
+  /* form */
+  .intro{ display:grid; grid-template-columns:1.2fr 1fr; gap:22px; align-items:start; margin-bottom:18px; }
+  .intro p{ font-size:15px; color:var(--text); max-width:60ch; }
+  .intro p b{ color:var(--text); }
+  .meta{ display:grid; grid-template-columns:1fr 1fr; gap:14px 16px; background:var(--surface); padding:16px; border-top:3px solid var(--ink); }
+  .meta label,.lbl{ display:block; font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--muted); margin-bottom:4px; }
+  .meta input,.meta select{ width:100%; background:transparent; border:0; border-bottom:1.5px solid var(--line); padding:6px 0; font-weight:400; }
+  .meta input:focus,.meta select:focus{ border-bottom-color:var(--verm); box-shadow:none; }
+  .meta select{ appearance:none; -webkit-appearance:none; background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%); background-position:calc(100% - 12px) 55%,calc(100% - 7px) 55%; background-size:5px 5px; background-repeat:no-repeat; }
+  @media (max-width:760px){ .intro{ grid-template-columns:1fr; } }
+
+  .legend{ display:flex; gap:20px; align-items:center; font-size:13px; color:var(--muted); margin:6px 0 10px; flex-wrap:wrap; }
+  .sw{ display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:-1px; margin-right:6px; }
+  .sw.hands{ background:var(--verm); } .sw.wait{ background:var(--wait); }
+
+  .phase{ background:var(--surface); margin-top:14px; padding:14px 16px 10px; border-top:3px solid var(--ink); }
+  .phase-h{ display:grid; grid-template-columns:1fr 120px 2fr; gap:14px; align-items:baseline; padding-bottom:8px; border-bottom:1.5px solid var(--text); }
+  .phase-h h2{ font-size:17px; font-weight:800; letter-spacing:-.01em; }
+  .phase-h h2 span{ color:var(--verm); margin-right:8px; }
+  .row{ display:grid; grid-template-columns:1fr 120px 2fr; gap:14px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line2); }
+  .row:last-of-type{ border-bottom:0; }
+  .row .name{ display:flex; gap:10px; align-items:center; font-size:15px; font-weight:400; }
+  .row .name .k{ flex:none; width:16px; height:16px; border-radius:2px; background:var(--verm); }
+  .row.wait .name .k{ background:var(--wait); }
+  .row .name small{ display:block; font-size:12.5px; color:var(--muted); font-weight:300; line-height:1.3; }
+  .row input{ width:100%; background:var(--paper); border:1px solid var(--line); border-radius:3px; padding:8px 10px; font-weight:400; }
+  .row input.min{ text-align:right; font-weight:700; font-size:16px; }
+  .row input::placeholder{ color:var(--muted); opacity:.7; font-weight:300; }
+  .row input:focus{ border-color:var(--verm); }
+  .sub{ display:grid; grid-template-columns:1fr 120px 2fr; gap:14px; padding:8px 0 4px; font-size:12.5px; color:var(--muted); border-top:1px solid var(--line2); margin-top:2px; }
+  .sub .v{ text-align:right; font-weight:700; color:var(--text); font-size:14px; }
+  @media (max-width:640px){
+    .phase-h{ grid-template-columns:1fr; } .phase-h .lbl{ display:none; }
+    .row{ grid-template-columns:96px 1fr; grid-template-areas:"name name" "min note"; }
+    .row .name{ grid-area:name; } .row .min{ grid-area:min; } .row .note{ grid-area:note; }
+    .sub{ grid-template-columns:1fr auto; } .sub .sp{ display:none; }
+  }
+
+  .totals{ margin-top:18px; display:grid; grid-template-columns:320px 1fr; gap:16px; }
+  .big{ background:var(--ink); color:#fff; border-top:3px solid var(--verm); padding:18px 20px; }
+  .big .lbl{ color:#BDBDBD; }
+  .big .n{ font-size:40px; font-weight:800; line-height:1; letter-spacing:-.02em; margin-top:6px; }
+  .big .n small{ font-size:15px; font-weight:600; color:#BDBDBD; margin:0 10px 0 4px; letter-spacing:0; }
+  .big .split{ margin-top:12px; display:flex; gap:18px; font-size:13px; color:#CFCFCF; }
+  .big .split b{ color:#fff; }
+  .bars{ background:var(--surface); border-top:3px solid var(--verm); padding:14px 16px; }
+  .bar{ display:grid; grid-template-columns:150px 1fr 48px; gap:12px; align-items:center; font-size:13px; margin-top:6px; }
+  .bar .trk{ height:14px; background:var(--surface2); border:1px solid var(--line); border-radius:2px; overflow:hidden; display:flex; }
+  .bar .fh{ background:var(--verm); } .bar .fw{ background:var(--wait); }
+  .bar .v{ text-align:right; font-weight:700; }
+  @media (max-width:760px){ .totals{ grid-template-columns:1fr; } .bar{ grid-template-columns:110px 1fr 44px; } }
+
+  .actions{ margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .btn{ font-size:14px; font-weight:700; padding:11px 18px; border:1.5px solid var(--text); background:var(--surface); color:var(--text); border-radius:3px; }
+  .btn.primary{ background:var(--verm); border-color:var(--verm); color:#fff; }
+  .btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .btn:hover:not(:disabled){ filter:brightness(.95); }
+  .status{ font-size:13px; color:var(--muted); margin-left:auto; }
+
+  /* summary */
+  .sum-h{ display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; }
+  .sum-h h2{ font-size:24px; font-weight:800; letter-spacing:-.01em; }
+  .sum-h h2 span{ color:var(--verm); }
+  .sum-h p{ color:var(--muted); font-size:14px; }
+  .filters{ margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .filters select{ background:var(--surface); border:1px solid var(--line); border-radius:3px; padding:8px 30px 8px 10px; font-weight:400; appearance:none; -webkit-appearance:none; background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%); background-position:calc(100% - 14px) 55%,calc(100% - 9px) 55%; background-size:5px 5px; background-repeat:no-repeat; }
+  .kpis{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .kpi{ background:var(--surface); border-top:3px solid var(--ink); padding:14px 16px 16px; }
+  .kpi.dark{ background:var(--ink); color:#fff; border-top-color:var(--verm); }
+  .kpi.dark .lbl{ color:#BDBDBD; }
+  .kpi .n{ font-size:30px; font-weight:800; line-height:1.05; letter-spacing:-.02em; margin-top:4px; }
+  .kpi .n small{ font-size:13px; font-weight:600; color:var(--muted); letter-spacing:0; margin-left:3px; }
+  .kpi.dark .n small{ color:#BDBDBD; }
+  .kpi .sub2{ font-size:12.5px; color:var(--muted); margin-top:6px; }
+  .kpi.dark .sub2{ color:#CFCFCF; }
+  @media (max-width:760px){ .kpis{ grid-template-columns:1fr 1fr; } }
+
+  .grid2{ display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin-top:14px; }
+  @media (max-width:860px){ .grid2{ grid-template-columns:1fr; } }
+  .card{ background:var(--surface); border-top:3px solid var(--ink); padding:14px 16px 16px; }
+  .card h3{ font-size:16px; font-weight:800; letter-spacing:-.01em; margin-bottom:4px; }
+  .card .hint{ font-size:12.5px; color:var(--muted); margin-bottom:10px; }
+  .steps-tbl{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .steps-tbl th{ text-align:left; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; padding:6px 8px 6px 0; border-bottom:1.5px solid var(--text); }
+  .steps-tbl th.r,.steps-tbl td.r{ text-align:right; }
+  .steps-tbl td{ padding:7px 8px 7px 0; border-bottom:1px solid var(--line2); vertical-align:middle; }
+  .steps-tbl tr.ph td{ padding-top:12px; font-size:11px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; color:var(--muted); border-bottom:0; }
+  .steps-tbl .k{ display:inline-block; width:10px; height:10px; border-radius:2px; background:var(--verm); margin-right:8px; vertical-align:-1px; }
+  .steps-tbl tr.wait .k{ background:var(--wait); }
+  .steps-tbl .trk{ height:10px; background:var(--surface2); border:1px solid var(--line); border-radius:2px; overflow:hidden; min-width:70px; }
+  .steps-tbl .trk i{ display:block; height:100%; background:var(--verm); }
+  .steps-tbl tr.wait .trk i{ background:var(--wait); }
+  .steps-tbl td.rng{ color:var(--muted); white-space:nowrap; }
+  .tbl-wrap{ overflow-x:auto; }
+  .top3{ list-style:none; }
+  .top3 li{ display:grid; grid-template-columns:28px 1fr auto; gap:10px; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line2); }
+  .top3 li:last-child{ border-bottom:0; }
+  .top3 .rk{ font-size:22px; font-weight:800; color:var(--verm); line-height:1; }
+  .top3 .v{ font-weight:700; white-space:nowrap; }
+  .top3 small{ display:block; color:var(--muted); font-size:12.5px; }
+  .notes{ list-style:none; margin-top:6px; }
+  .notes li{ padding:8px 0; border-bottom:1px solid var(--line2); font-size:13.5px; }
+  .notes li:last-child{ border-bottom:0; }
+  .notes .st{ font-size:11px; letter-spacing:.10em; text-transform:uppercase; font-weight:700; color:var(--muted); display:block; margin-bottom:2px; }
+  .notes .by{ color:var(--muted); }
+  .entries{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .entries th{ text-align:left; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-weight:700; padding:6px 8px 6px 0; border-bottom:1.5px solid var(--text); white-space:nowrap; }
+  .entries td{ padding:8px 8px 8px 0; border-bottom:1px solid var(--line2); white-space:nowrap; }
+  .entries td.r,.entries th.r{ text-align:right; }
+  .entries .del{ background:transparent; border:1px solid var(--line); border-radius:3px; padding:3px 8px; font-size:12px; color:var(--muted); }
+  .entries .del:hover{ border-color:var(--verm); color:var(--verm); }
+  .empty{ background:var(--surface); border-top:3px solid var(--ink); padding:28px 20px; text-align:center; }
+  .empty h3{ font-size:20px; font-weight:800; margin-bottom:6px; }
+  .empty p{ color:var(--muted); max-width:52ch; margin:0 auto 14px; }
+  .pill{ display:inline-block; font-size:11px; letter-spacing:.10em; text-transform:uppercase; font-weight:700; padding:3px 8px; border-radius:2px; background:var(--verm-soft); color:var(--verm); vertical-align:middle; margin-left:8px; }
+  .toast{ position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-left:4px solid var(--verm); font-size:14px; border-radius:3px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:9; }
+  .toast.show{ opacity:1; }
+  footer{ max-width:1040px; margin:0 auto; padding:0 20px 30px; font-size:12px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  footer b{ color:var(--text); font-weight:600; letter-spacing:.08em; }
+  @media (prefers-reduced-motion:reduce){ .toast{ transition:none; } }
+</style>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <img src="{{LOGO}}" alt="POS360">
+    <h1>360 Pro install <span>time study</span></h1>
+    <div class="who" id="who"></div>
+    <button class="gear" id="gear" type="button" aria-label="Team results" title="Team results" data-unlocked="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div id="notice" class="notice" hidden></div>
+
+  <!-- ============ LOG ============ -->
+  <section class="view" id="view-log">
+    <div class="intro">
+      <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time spent waiting on someone else or dealing with interruptions. When you save, your numbers join the team's and the averages update for everyone.</p>
+      <div class="meta">
+        <div><label for="m-name">Installer</label><input id="m-name" data-key="name" placeholder="Your name" autocomplete="name"></div>
+        <div><label for="m-date">Date</label><input id="m-date" data-key="date" type="date"></div>
+        <div><label for="m-exp">Installs completed</label>
+          <select id="m-exp" data-key="exp"><option value="">Choose</option><option>1 to 5</option><option>6 to 20</option><option>21 to 50</option><option>50 or more</option></select></div>
+        <div><label for="m-store">Typical store type</label><input id="m-store" data-key="store" placeholder="Liquor, convenience, smoke shop"></div>
+      </div>
+    </div>
+
+    <div class="legend"><span><i class="sw hands"></i>Hands-on time</span><span><i class="sw wait"></i>Waiting or interrupted</span><span style="margin-left:auto">Minutes. Whole numbers are fine.</span></div>
+    <div id="phases"></div>
+
+    <div class="totals">
+      <div class="big">
+        <div class="lbl">Your typical time on site, one station</div>
+        <div class="n num"><span id="t-hours">0</span><small>hr</small><span id="t-mins">0</span><small>min</small></div>
+        <div class="split"><span>Hands-on <b id="t-hands" class="num">0 min</b></span><span>Waiting <b id="t-wait" class="num">0 min</b></span></div>
+      </div>
+      <div class="bars"><div class="lbl">Where your time goes</div><div id="bars"></div></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn primary" id="b-save">Save to team data</button>
+      <button class="btn" id="b-copy">Copy summary for Slack</button>
+      <button class="btn" id="b-reset">Clear</button>
+      <span class="status" id="status"></span>
+    </div>
+  </section>
+
+  <!-- ============ SUMMARY ============ -->
+  <section class="view" id="view-sum" hidden>
+    <div class="backbar"><button class="btn" id="b-back">← Back to my times</button><button class="btn" id="b-lock">Lock results</button><span class="lockmsg" id="lockmsg"></span></div>
+    <div class="sum-h">
+      <div><h2>Team <span>averages</span></h2><p id="sum-sub">One station, one location. Every saved study, averaged per step.</p></div>
+      <div class="filters">
+        <label class="lbl" for="f-exp" style="margin:0">Experience</label>
+        <select id="f-exp"><option value="">Everyone</option><option>1 to 5</option><option>6 to 20</option><option>21 to 50</option><option>50 or more</option></select>
+        <button class="btn" id="b-copy-sum">Copy for Slack</button>
+        <button class="btn" id="b-export" hidden>Download CSV</button>
+      </div>
+    </div>
+    <div id="sum-body"></div>
+  </section>
+</main>
+
+<footer>
+  <span>Pairs with the 360 Pro quick install card. Post summaries to the Deployments Slack channel.</span>
+  <span>POS360 · <b>SYSTEMS MADE SIMPLE</b></span>
+</footer>
+<dialog class="gate" id="gate">
+  <form method="dialog" id="gate-form">
+    <h3 id="gate-title">Team results</h3>
+    <p id="gate-text">Enter the results password to see the team averages.</p>
+    <div class="field" id="gate-pw-field"><input id="gate-pw" type="password" autocomplete="off" placeholder="Password" aria-label="Results password"></div>
+    <div class="err" id="gate-err"></div>
+    <div class="btns"><button class="btn" type="button" id="gate-cancel">Cancel</button><button class="btn primary" type="submit" id="gate-open">Unlock</button></div>
+    <div class="admin" id="gate-admin" hidden>
+      <hr>
+      <h4 id="gate-admin-title">Results password</h4>
+      <div class="field"><input id="gate-new" type="text" autocomplete="off" placeholder="New password for the team results" aria-label="New results password"></div>
+      <div class="btns"><button class="btn" type="button" id="gate-set">Save password</button></div>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  const PHASES = [
+    { id:'arrive', n:'0', title:'Arrive and document', steps:[
+      { id:'checkin', name:'Check in and walk the site', sub:'Meet the manager, ask permission to shoot' },
+      { id:'photos',  name:'Photos and video', sub:'Storefront, six angles of the old register setup' },
+      { id:'unbox',   name:'Unbox and stage', sub:'Clear the counter, match the small box to its register' },
+    ]},
+    { id:'wire', n:'1–8', title:'Wire it', steps:[
+      { id:'brain',   name:'1 · Place the Brain', sub:'Move the old register aside, keep it selling' },
+      { id:'ups',     name:'2 · Power the battery backup' },
+      { id:'wake',    name:'3 · Wake the Brain', sub:'Power, switch, boot, blue WAN cable' },
+      { id:'printer', name:'4 · Connect the receipt printer' },
+      { id:'term',    name:'5 · Mount the card terminal', sub:'Includes agreeing the spot with the merchant' },
+      { id:'lcd',     name:'6 · Mount the customer display' },
+      { id:'periph',  name:'7 · Scanners and label printers' },
+      { id:'cables',  name:'8 · Tidy the cables', sub:'Velcro, cable cover' },
+      { id:'isp',     name:'Wait for online confirmation', sub:'Tech confirms store ISP and LTE', type:'wait' },
+    ]},
+    { id:'data', n:'', title:'Data transfer', steps:[
+      { id:'pull',    name:'Data pull from the old register', sub:'Data Transfer Team works the old system', type:'wait' },
+      { id:'convert', name:'Data conversion', sub:'Waiting for the converted database to land', type:'wait' },
+    ]},
+    { id:'test', n:'', title:'Prove it works', steps:[
+      { id:'scan',    name:'Scan 20 items and check pricing' },
+      { id:'sale',    name:'One-cent sale, void, label print' },
+      { id:'lte',     name:'Backup internet test', sub:'ISP check with the Data team, unplug, sale, replug' },
+      { id:'fixes',   name:'Fix anything that failed', sub:'Pricing corrections, hardware swaps, callbacks' },
+    ]},
+    { id:'live', n:'', title:'Go live', steps:[
+      { id:'batch',   name:'Merchant batches the old terminal', sub:'Reports run before anything is unplugged', type:'wait' },
+      { id:'switch',  name:'Switch to live and remove the old hardware' },
+    ]},
+    { id:'close', n:'', title:'Close out', steps:[
+      { id:'walk',    name:'Walk the merchant through the setup' },
+      { id:'qc',      name:'Digital QC Sheet, photos, Slack posts' },
+      { id:'notes',   name:'Check out and closeout notes' },
+    ]},
+    { id:'misc', n:'', title:'Miscellaneous, across the visit', steps:[
+      { id:'traffic', name:'Customer traffic', sub:'Stepping aside so the merchant can ring sales', type:'wait' },
+      { id:'mxq',     name:'Merchant questions', sub:'Conversations, demos, and explaining what comes next', type:'wait' },
+      { id:'other',   name:'Other interruptions', sub:'Deliveries, phone calls, anything else that stopped the clock', type:'wait' },
+    ]},
+  ];
+  const STEPS = PHASES.flatMap(p => p.steps.map(s => ({...s, phase:p.id, phaseTitle:p.title})));
+  const STEP = Object.fromEntries(STEPS.map(s => [s.id, s]));
+  const DRAFT = 'pos360-time-study-draft-v1';
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = m => { m = Math.round(m || 0); return m >= 60 ? `${Math.floor(m/60)} hr ${m%60} min` : `${m} min`; };
+  const mean = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
+  const median = a => { if (!a.length) return 0; const s=[...a].sort((x,y)=>x-y), h=s.length>>1; return s.length%2 ? s[h] : (s[h-1]+s[h])/2; };
+
+  // ---------- capabilities (resolve later, never block first paint) ----------
+  let db = null, user = null, downloads = null, uid = null, canWrite = null, isAdmin = false;
+  let entries = [], unsub = null, dbReady = false, readOnly = false;
+
+  // ---------- build form ----------
+  const host = $('#phases');
+  PHASES.forEach(ph => {
+    const sec = document.createElement('section'); sec.className = 'phase';
+    sec.innerHTML = `<div class="phase-h"><h2>${ph.n ? `<span>${ph.n}</span>` : ''}${esc(ph.title)}</h2><div class="lbl" style="text-align:right;margin:0">Minutes</div><div class="lbl" style="margin:0">Notes, what makes it slow</div></div>`;
+    ph.steps.forEach(st => {
+      const row = document.createElement('div'); row.className = 'row' + (st.type==='wait' ? ' wait' : '');
+      row.innerHTML = `<div class="name"><i class="k" title="${st.type==='wait'?'Waiting':'Hands-on'}"></i><div>${esc(st.name)}${st.sub ? `<small>${esc(st.sub)}</small>` : ''}</div></div>
+        <input class="min num" id="min-${st.id}" type="number" min="0" step="1" inputmode="numeric" placeholder="0" data-min="${st.id}" aria-label="Minutes for ${esc(st.name)}">
+        <input class="note" id="note-${st.id}" type="text" placeholder="Optional" data-note="${st.id}" aria-label="Notes for ${esc(st.name)}">`;
+      sec.appendChild(row);
+    });
+    const sub = document.createElement('div'); sub.className = 'sub';
+    sub.innerHTML = `<div>Phase total</div><div class="v num" data-sub="${ph.id}">0 min</div><div class="sp"></div>`;
+    sec.appendChild(sub); host.appendChild(sec);
+  });
+
+  // draft restore (per-device convenience only)
+  try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
+    document.querySelectorAll('[data-min]').forEach(i => { const v = d.min?.[i.dataset.min]; if (v != null && v !== '') i.value = v; });
+    document.querySelectorAll('[data-note]').forEach(i => { const v = d.note?.[i.dataset.note]; if (v) i.value = v; });
+    document.querySelectorAll('[data-key]').forEach(i => { const v = d.meta?.[i.dataset.key]; if (v) i.value = v; });
+  }} catch(e){}
+  if (!$('#m-date').value) $('#m-date').value = new Date().toISOString().slice(0,10);
+
+  const minutesOf = id => { const n = parseFloat($(`[data-min="${id}"]`).value); return isNaN(n) || n < 0 ? 0 : n; };
+  function readForm(){
+    const minutes = {}, notes = {}; let hands = 0, wait = 0;
+    STEPS.forEach(s => { const m = minutesOf(s.id); if (m) minutes[s.id] = m; if (s.type==='wait') wait += m; else hands += m; const nt = $(`[data-note="${s.id}"]`).value.trim(); if (nt) notes[s.id] = nt.slice(0, 300); });
+    return { name: $('#m-name').value.trim().slice(0,80), date: $('#m-date').value, exp: $('#m-exp').value, store: $('#m-store').value.trim().slice(0,80), minutes, notes, hands, wait, total: hands + wait };
+  }
+  function compute(){
+    const f = readForm(); const per = [];
+    PHASES.forEach(ph => { let h=0,w=0; ph.steps.forEach(s => { const m = f.minutes[s.id]||0; if (s.type==='wait') w+=m; else h+=m; }); per.push({title:ph.title,h,w}); $(`[data-sub="${ph.id}"]`).textContent = fmt(h+w); });
+    $('#t-hours').textContent = Math.floor(f.total/60); $('#t-mins').textContent = Math.round(f.total%60);
+    $('#t-hands').textContent = fmt(f.hands); $('#t-wait').textContent = fmt(f.wait);
+    $('#bars').innerHTML = barsHTML(per, f.total);
+    return f;
+  }
+  function barsHTML(per, total){
+    const max = Math.max(1, ...per.map(p => p.h + p.w));
+    return per.map(p => { const t = p.h+p.w, pct = total ? Math.round(t/total*100) : 0;
+      return `<div class="bar"><div>${esc(p.title)}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v num">${pct}%</div></div>`; }).join('');
+  }
+  let saveT;
+  function saveDraft(){
+    const s = { min:{}, note:{}, meta:{} };
+    document.querySelectorAll('[data-min]').forEach(i => { if (i.value !== '') s.min[i.dataset.min] = i.value; });
+    document.querySelectorAll('[data-note]').forEach(i => { if (i.value) s.note[i.dataset.note] = i.value; });
+    document.querySelectorAll('[data-key]').forEach(i => { if (i.value) s.meta[i.dataset.key] = i.value; });
+    try { localStorage.setItem(DRAFT, JSON.stringify(s)); } catch(e){}
+  }
+  $('#view-log').addEventListener('input', () => { compute(); clearTimeout(saveT); saveT = setTimeout(saveDraft, 300); });
+  compute();
+
+  // ---------- views + password gate ----------
+  const GATE_KEY = 'pos360-ts-unlock';
+  let gateHash = null, gateLoaded = false, unlocked = false;
+  async function sha(t){ const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('pos360-ts:' + t)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join(''); }
+  function show(which){
+    const log = which === 'log';
+    if (!log && !(unlocked || isAdmin)) { openGate(); return; }
+    $('#view-log').hidden = !log; $('#view-sum').hidden = log;
+    if (!log) { subscribe(); renderSummary(); $('#lockmsg').textContent = isAdmin ? 'You see this as an editor of the page.' : ''; }
+    window.scrollTo({ top: 0 });
+  }
+  $('#b-back').onclick = () => show('log');
+  $('#b-lock').onclick = () => { unlocked = false; try { sessionStorage.removeItem(GATE_KEY); } catch(e){} $('#gear').dataset.unlocked = 'false'; show('log'); toast('Results locked.'); };
+  async function loadGate(){
+    if (!db) { gateLoaded = true; return; }
+    try { const snap = await db.doc('config/gate').get(); gateHash = snap.exists ? (snap.data().hash || null) : null; } catch(e){}
+    gateLoaded = true;
+    try { const u = sessionStorage.getItem(GATE_KEY); if (u && gateHash && u === gateHash) { unlocked = true; $('#gear').dataset.unlocked = 'true'; } } catch(e){}
+  }
+  const gate = $('#gate');
+  function openGate(){
+    $('#gate-err').textContent = ''; $('#gate-pw').value = ''; $('#gate-new').value = '';
+    const admin = !!isAdmin;
+    $('#gate-admin').hidden = !admin;
+    $('#gate-pw-field').hidden = admin;
+    $('#gate-open').textContent = admin ? 'Open team averages' : 'Unlock';
+    if (!db) { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = 'Team results need a signed-in POS360 Claude account. Open the page from its claude.ai link.'; $('#gate-pw-field').hidden = true; $('#gate-open').hidden = true; }
+    else if (admin) { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = gateHash ? 'Installers unlock the averages with the results password. You can change it here.' : 'No results password is set yet, so only page editors can open the averages. Set one below to let installers in.'; $('#gate-admin-title').textContent = gateHash ? 'Change the results password' : 'Set the results password'; $('#gate-open').hidden = false; }
+    else if (!gateHash) { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = gateLoaded ? 'The team averages are not open yet. Ask Nate for the results password once it is set.' : 'Loading…'; $('#gate-pw-field').hidden = true; $('#gate-open').hidden = true; }
+    else { $('#gate-title').textContent = 'Team results'; $('#gate-text').textContent = 'Enter the results password to see the team averages.'; $('#gate-open').hidden = false; }
+    if (typeof gate.showModal === 'function') gate.showModal(); else gate.setAttribute('open','');
+    if (!admin && gateHash) setTimeout(() => $('#gate-pw').focus(), 30);
+  }
+  function closeGate(){ if (gate.open) gate.close(); else gate.removeAttribute('open'); }
+  $('#gate-cancel').onclick = closeGate;
+  $('#gate-form').onsubmit = async (ev) => {
+    ev.preventDefault();
+    if (isAdmin) { closeGate(); show('sum'); return; }
+    const pw = $('#gate-pw').value; if (!pw) { $('#gate-err').textContent = 'Type the password first.'; return; }
+    const h = await sha(pw);
+    if (gateHash && h === gateHash) { unlocked = true; try { sessionStorage.setItem(GATE_KEY, h); } catch(e){} $('#gear').dataset.unlocked = 'true'; closeGate(); show('sum'); }
+    else { $('#gate-err').textContent = 'That password did not match.'; $('#gate-pw').select(); }
+  };
+  $('#gate-set').onclick = async () => {
+    const pw = $('#gate-new').value.trim();
+    if (pw.length < 4) { $('#gate-err').textContent = 'Use at least 4 characters.'; return; }
+    if (!db) return;
+    const btn = $('#gate-set'); btn.disabled = true;
+    try { const h = await sha(pw); await db.doc('config/gate').set({ hash: h, updatedAt: new Date().toISOString() }); gateHash = h; $('#gate-err').textContent = ''; $('#gate-new').value = ''; toast('Results password saved. Share it with installers who should see the averages.'); openGate(); }
+    catch(e){ $('#gate-err').textContent = 'Could not save the password right now.'; }
+    finally { btn.disabled = false; }
+  };
+  $('#gear').onclick = () => { if (unlocked || isAdmin) { if ($('#view-sum').hidden) show('sum'); else openGate(); } else openGate(); };
+
+  // ---------- notices / toast ----------
+  let toastT;
+  function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+  function notice(html, ok){ const n = $('#notice'); if (!html) { n.hidden = true; return; } n.innerHTML = html; n.className = 'notice' + (ok ? ' ok' : ''); n.hidden = false; }
+
+  // ---------- form actions ----------
+  $('#b-reset').onclick = () => { if (!confirm('Clear every number and note on this form?')) return; document.querySelectorAll('.row input').forEach(i => i.value = ''); compute(); saveDraft(); };
+  $('#b-copy').onclick = async () => {
+    const f = compute(); const per = PHASES.map(ph => ({ title: ph.title, t: ph.steps.reduce((a,s)=>a+(f.minutes[s.id]||0),0), w: ph.steps.filter(s=>s.type==='wait').reduce((a,s)=>a+(f.minutes[s.id]||0),0) }));
+    const lines = [`*360 Pro install time study* · ${f.name || 'Installer'}${f.exp ? ` · ${f.exp} installs` : ''}${f.store ? ` · ${f.store}` : ''}`,
+      `Typical time on site, 1 station: *${fmt(f.total)}* (hands-on ${fmt(f.hands)}, waiting ${fmt(f.wait)})`, ''];
+    per.forEach(p => { if (p.t) lines.push(`• ${p.title}: ${fmt(p.t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}`); });
+    const notes = Object.entries(f.notes).map(([id, v]) => `• ${STEP[id].name}: ${v}`); if (notes.length) lines.push('', '*What slows it down*', ...notes);
+    await copy(lines.join('\n'));
+  };
+  async function copy(text){ try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into the Deployments Slack channel.'); } catch(e){ prompt('Copy this summary:', text); } }
+
+  $('#b-save').onclick = async () => {
+    const f = readForm();
+    if (!f.name) { toast('Add your name first so the team knows whose numbers these are.'); $('#m-name').focus(); return; }
+    if (Object.keys(f.minutes).length < 5) { toast('Fill in at least a handful of steps before saving.'); return; }
+    if (!db) { toast('Saving needs a signed-in POS360 Claude account. Your numbers are kept on this device.'); return; }
+    const btn = $('#b-save'); btn.disabled = true; $('#status').textContent = 'Saving…';
+    try {
+      await db.collection('studies').add({ ...f, uid: uid || null, createdAt: new Date().toISOString(), v: 1 });
+      $('#status').textContent = ''; toast('Saved. Thank you, your study is in the team data.');
+      if (unlocked || isAdmin) show('sum');
+    } catch(e) {
+      $('#status').textContent = '';
+      if (e && e.code === 'invalid_argument') { readOnly = true; notice('<div><b>This account can view the team data but not add to it.</b>Ask Nate for "Can interact" access on this page, then save again. Your numbers are kept on this device meanwhile.</div>'); }
+      else if (e && e.code === 'quota_exceeded') { notice('<div><b>The team data store is full.</b>Older studies need to be exported and pruned before new ones can be saved.</div>'); }
+      else { toast('Could not save right now. Try again in a moment.'); }
+    } finally { btn.disabled = false; }
+  };
+
+  // ---------- summary ----------
+  const EXAMPLE = [
+    { name:'Example A', exp:'50 or more', store:'Liquor', minutes:{checkin:10,photos:10,unbox:15,brain:10,ups:5,wake:10,printer:10,term:15,lcd:10,periph:15,cables:20,isp:10,pull:45,convert:30,scan:20,sale:10,lte:10,fixes:15,batch:15,switch:20,walk:20,qc:15,lead:15,notes:10,traffic:15,mxq:20,other:5} },
+    { name:'Example B', exp:'6 to 20', store:'Convenience', minutes:{checkin:15,photos:15,unbox:20,brain:15,ups:5,wake:15,printer:15,term:25,lcd:15,periph:20,cables:30,isp:15,pull:60,convert:45,scan:30,sale:15,lte:15,fixes:30,batch:20,switch:25,walk:25,qc:20,lead:25,notes:15,traffic:25,mxq:30,other:10} },
+    { name:'Example C', exp:'1 to 5', store:'Smoke shop', minutes:{checkin:15,photos:20,unbox:25,brain:20,ups:10,wake:20,printer:20,term:30,lcd:20,periph:25,cables:40,isp:20,pull:60,convert:60,scan:40,sale:20,lte:20,fixes:45,batch:30,switch:30,walk:30,qc:25,lead:30,notes:20,traffic:30,mxq:45,other:15} },
+  ].map(e => { let h=0,w=0; STEPS.forEach(s => { const m=e.minutes[s.id]||0; if (s.type==='wait') w+=m; else h+=m; }); return {...e, hands:h, wait:w, total:h+w, notes:{}, date:'', example:true}; });
+  let showExamples = false;
+
+  function subscribe(){
+    if (unsub || !db) return;
+    try {
+      unsub = db.collection('studies').orderBy('createdAt','desc').limit(1000).onSnapshot(snap => {
+        entries = snap.docs.map(d => ({ id: d.id, ...d.data() })); dbReady = true;
+        if (!$('#view-sum').hidden) renderSummary();
+        $('#sum-sub').textContent = entries.length ? `One station, one location. ${entries.length} saved ${entries.length===1?'study':'studies'}, averaged per step.` : 'One station, one location. Every saved study, averaged per step.';
+      }, err => { dbReady = true; if (!$('#view-sum').hidden) renderSummary(); });
+    } catch(e){ dbReady = true; }
+  }
+
+  function stats(list){
+    const per = {}; STEPS.forEach(s => per[s.id] = []);
+    list.forEach(e => STEPS.forEach(s => { const m = Number(e.minutes?.[s.id]); if (!isNaN(m) && m > 0) per[s.id].push(m); }));
+    const step = STEPS.map(s => { const a = per[s.id]; return { ...s, n:a.length, avg:mean(a), med:median(a), min:a.length?Math.min(...a):0, max:a.length?Math.max(...a):0 }; });
+    const phase = PHASES.map(ph => { const h = step.filter(s=>s.phase===ph.id && s.type!=='wait').reduce((x,s)=>x+s.avg,0), w = step.filter(s=>s.phase===ph.id && s.type==='wait').reduce((x,s)=>x+s.avg,0); return { title: ph.title, h, w }; });
+    const totals = list.map(e => Number(e.total)||0), hands = list.map(e => Number(e.hands)||0), waits = list.map(e => Number(e.wait)||0);
+    const people = new Set(list.map(e => (e.name||'').trim().toLowerCase()).filter(Boolean)).size;
+    return { step, phase, n:list.length, people, avgTotal:mean(totals), medTotal:median(totals), avgHands:mean(hands), avgWait:mean(waits), minTotal: totals.length?Math.min(...totals):0, maxTotal: totals.length?Math.max(...totals):0 };
+  }
+
+  let lastStats = null;
+  async function renderSummary(){
+    const body = $('#sum-body'); const fexp = $('#f-exp').value;
+    let list = entries.filter(e => !fexp || e.exp === fexp);
+    let usingExamples = false;
+    if (!entries.length && showExamples) { list = EXAMPLE.filter(e => !fexp || e.exp === fexp); usingExamples = true; }
+    if (!list.length) {
+      lastStats = null;
+      body.innerHTML = `<div class="empty"><h3>${entries.length ? 'No studies match that filter yet' : (dbReady ? 'No studies saved yet' : (db === null && window.claude ? 'Loading team data…' : 'Team data needs a signed-in POS360 account'))}</h3>
+        <p>${entries.length ? 'Try a different experience band.' : 'Once installers save their times, the per-step averages, ranges, and slow-down notes show up here.'}</p>
+        ${!entries.length ? `<button class="btn" id="b-ex">Preview with example data</button>` : ''}</div>`;
+      const b = $('#b-ex'); if (b) b.onclick = () => { showExamples = true; renderSummary(); };
+      $('#b-export').hidden = true; return;
+    }
+    const S = stats(list); lastStats = S;
+    const maxAvg = Math.max(1, ...S.step.map(s => s.avg));
+    const topHands = [...S.step].filter(s => s.type!=='wait' && s.n).sort((a,b)=>b.avg-a.avg).slice(0,3);
+    const topWait = [...S.step].filter(s => s.type==='wait' && s.n).sort((a,b)=>b.avg-a.avg).slice(0,3);
+    const notes = []; list.forEach(e => Object.entries(e.notes||{}).forEach(([id,v]) => { if (STEP[id] && v) notes.push({ step: STEP[id].name, by: e.name || 'Installer', v }); }));
+    const ex = usingExamples ? `<span class="pill">Example data</span>` : '';
+
+    let rows = '';
+    PHASES.forEach(ph => {
+      rows += `<tr class="ph"><td colspan="6">${esc(ph.title)}</td></tr>`;
+      S.step.filter(s => s.phase===ph.id).forEach(s => {
+        rows += `<tr class="${s.type==='wait'?'wait':''}"><td><i class="k"></i>${esc(s.name)}</td><td class="r num"><b>${s.n ? Math.round(s.avg) : '–'}</b></td><td class="r num">${s.n ? Math.round(s.med) : '–'}</td><td class="rng num">${s.n ? `${s.min} to ${s.max}` : '–'}</td><td class="r num">${s.n}</td><td><div class="trk"><i style="width:${s.avg/maxAvg*100}%"></i></div></td></tr>`;
+      });
+    });
+
+    body.innerHTML = `
+      <div class="kpis">
+        <div class="kpi dark"><div class="lbl">Average time on site${ex}</div><div class="n num">${Math.floor(S.avgTotal/60)}<small>hr</small> ${Math.round(S.avgTotal%60)}<small>min</small></div><div class="sub2">Median ${fmt(S.medTotal)} · range ${fmt(S.minTotal)} to ${fmt(S.maxTotal)}</div></div>
+        <div class="kpi"><div class="lbl">Hands-on</div><div class="n num">${fmt(S.avgHands)}</div><div class="sub2">${S.avgTotal ? Math.round(S.avgHands/S.avgTotal*100) : 0}% of the visit</div></div>
+        <div class="kpi"><div class="lbl">Waiting or interrupted</div><div class="n num">${fmt(S.avgWait)}</div><div class="sub2">${S.avgTotal ? Math.round(S.avgWait/S.avgTotal*100) : 0}% of the visit</div></div>
+        <div class="kpi"><div class="lbl">Studies</div><div class="n num">${S.n}<small>from ${S.people} ${S.people===1?'installer':'installers'}</small></div><div class="sub2">${fexp ? `Filtered to ${esc(fexp)} installs` : 'All experience levels'}</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card"><h3>Where the time goes</h3><div class="hint">Average minutes per phase. Vermilion is hands-on, gray is waiting.</div>${barsHTML(S.phase, S.avgTotal)}</div>
+        <div class="card"><h3>Biggest time sinks</h3><div class="hint">Average minutes per step, hands-on and waiting.</div>
+          <ol class="top3">${topHands.map((s,i)=>`<li><span class="rk">${i+1}</span><span>${esc(s.name)}<small>Hands-on · ${esc(s.phaseTitle)}</small></span><span class="v num">${Math.round(s.avg)} min</span></li>`).join('')}
+          ${topWait.map((s,i)=>`<li><span class="rk" style="color:var(--wait)">${i+1}</span><span>${esc(s.name)}<small>Waiting · ${esc(s.phaseTitle)}</small></span><span class="v num">${Math.round(s.avg)} min</span></li>`).join('')}</ol></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Every step</h3><div class="hint">Minutes. Average, median, and the range reported. Steps nobody has timed show a dash.</div>
+        <div class="tbl-wrap"><table class="steps-tbl"><thead><tr><th>Step</th><th class="r">Avg</th><th class="r">Median</th><th>Range</th><th class="r">N</th><th style="width:22%">Relative</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+      <div class="grid2">
+        <div class="card"><h3>What slows it down</h3><div class="hint">Notes installers left on individual steps.</div>
+          ${notes.length ? `<ul class="notes">${notes.slice(0,40).map(n=>`<li><span class="st">${esc(n.step)}</span>${esc(n.v)} <span class="by">· ${esc(n.by)}</span></li>`).join('')}</ul>` : `<p class="hint">No notes yet.</p>`}</div>
+        <div class="card"><h3>Saved studies</h3><div class="hint">Newest first.${isAdmin ? ' You can remove any entry.' : ' You can remove your own.'}</div>
+          <div class="tbl-wrap"><table class="entries"><thead><tr><th>Date</th><th>Installer</th><th>Experience</th><th class="r">Total</th><th class="r">Hands-on</th><th class="r">Waiting</th><th></th></tr></thead><tbody>
+          ${list.slice(0,60).map(e => `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(e.total)}</b></td><td class="r num">${fmt(e.hands)}</td><td class="r num">${fmt(e.wait)}</td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`).join('')}
+          </tbody></table></div></div>
+      </div>`;
+    body.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      if (!confirm('Remove this study from the team data?')) return;
+      try { await db.doc('studies/' + b.dataset.del).delete(); toast('Removed.'); } catch(e){ toast('Could not remove it right now.'); }
+    });
+    $('#b-export').hidden = !(downloads && entries.length && !usingExamples);
+  }
+  $('#f-exp').onchange = renderSummary;
+
+  $('#b-copy-sum').onclick = async () => {
+    if (!lastStats || !lastStats.n) { toast('Nothing to summarize yet.'); return; }
+    const S = lastStats; const fexp = $('#f-exp').value;
+    const lines = [`*360 Pro install time study, team averages*${fexp ? ` · ${fexp} installs` : ''} · ${S.n} ${S.n===1?'study':'studies'} from ${S.people} ${S.people===1?'installer':'installers'}`,
+      `Average time on site, 1 station: *${fmt(S.avgTotal)}* (hands-on ${fmt(S.avgHands)}, waiting ${fmt(S.avgWait)}) · median ${fmt(S.medTotal)}`, ''];
+    S.phase.forEach(p => { const t = p.h+p.w; if (t) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}`); });
+    const top = [...S.step].filter(s=>s.n).sort((a,b)=>b.avg-a.avg).slice(0,5);
+    if (top.length) lines.push('', '*Biggest time sinks*', ...top.map(s => `• ${s.name}: ${Math.round(s.avg)} min avg (${s.min} to ${s.max}, n=${s.n})`));
+    await copy(lines.join('\n'));
+  };
+  $('#b-export').onclick = async () => {
+    if (!downloads) return;
+    const head = ['Date','Installer','Installs completed','Store type','Total min','Hands-on min','Waiting min', ...STEPS.map(s => s.name), ...STEPS.map(s => 'Note: ' + s.name)];
+    const rows = entries.map(e => [e.date, e.name, e.exp, e.store, e.total, e.hands, e.wait, ...STEPS.map(s => e.minutes?.[s.id] ?? ''), ...STEPS.map(s => e.notes?.[s.id] ?? '')]);
+    const csv = [head, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    try { await downloads.save({ filename: `360pro-time-studies-${new Date().toISOString().slice(0,10)}.csv`, data: csv }); } catch(e){ if (!(e && e.code === 'cancelled')) toast('The download did not go through.'); }
+  };
+
+  // ---------- resolve capabilities after first paint ----------
+  (async () => {
+    if (!window.claude || typeof window.claude.use !== 'function') {
+      notice('<div><b>Preview mode.</b> Open this page from its claude.ai link, signed in to your POS360 account, to save studies.</div>');
+      dbReady = true; return;
+    }
+    const [d, u, dl] = await Promise.all([claude.use('db'), claude.use('user'), claude.use('downloads')]);
+    db = d; user = u; downloads = dl;
+    if (user) { try { [uid, canWrite, isAdmin] = await Promise.all([user.id(), user.can('data.write'), user.canEdit()]); const me = await user.me(); if (me.name) $('#who').textContent = me.name; if (me.name && !$('#m-name').value) $('#m-name').value = me.name; } catch(e){} }
+    if (!db) { notice('<div><b>Team data is not available in this view.</b> You can still total your times and copy a summary for Slack. Open the page signed in to a POS360 Claude account to save.</div>'); dbReady = true; return; }
+    if (canWrite === false) { readOnly = true; notice('<div><b>This account cannot save studies.</b> Ask Nate for "Can interact" access on this page to add your own.</div>'); }
+    await loadGate();
+  })();
+})();
+</script>
