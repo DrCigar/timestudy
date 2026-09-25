@@ -1,5 +1,6 @@
 // GET    /api/studies          -> [ {id, ...study} ]  newest first; requires x-results-key (the unlocked hash)
 // POST   /api/studies {study}  -> { id }              anyone with the page can add a study
+// PUT    /api/studies?id=... {study} -> { id }       replace a study's fields; requires x-results-key
 // DELETE /api/studies?id=...   -> 204                 requires x-results-key
 import { ensureSchema, sql, isUnlocked, json, fail } from './_db.js';
 import { randomUUID } from 'crypto';
@@ -14,7 +15,7 @@ export default async function handler(req, res) {
       const rows = await sql()`SELECT id, body FROM studies ORDER BY created_at DESC LIMIT 1000`;
       return json(res, 200, rows.map(r => ({ id: r.id, ...r.body })));
     }
-    if (req.method === 'POST') {
+    if (req.method === 'POST' || req.method === 'PUT') {
       const raw = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
       if (raw.length > MAX_BODY) return json(res, 413, { error: 'Study is too large' });
       const b = JSON.parse(raw || '{}');
@@ -26,6 +27,17 @@ export default async function handler(req, res) {
         hands: Number(b.hands) || 0, wait: Number(b.wait) || 0, total: Number(b.total) || 0,
         uid: b.uid ? String(b.uid).slice(0, 80) : null, createdAt: new Date().toISOString(), v: 1,
       };
+      if (req.method === 'PUT') {
+        if (!(await isUnlocked(req))) return json(res, 401, { error: 'Results are locked' });
+        const id = String((req.query && req.query.id) || '');
+        if (!id) return json(res, 400, { error: 'id required' });
+        const rows = await sql()`SELECT body FROM studies WHERE id = ${id}`;
+        if (!rows.length) return json(res, 404, { error: 'No study with that id' });
+        const prev = rows[0].body || {};
+        const merged = { ...clean, uid: prev.uid ?? null, createdAt: prev.createdAt || clean.createdAt, updatedAt: new Date().toISOString() };
+        await sql()`UPDATE studies SET body = ${JSON.stringify(merged)}::jsonb WHERE id = ${id}`;
+        return json(res, 200, { id });
+      }
       const id = randomUUID();
       await sql()`INSERT INTO studies (id, body) VALUES (${id}, ${JSON.stringify(clean)}::jsonb)`;
       return json(res, 201, { id });

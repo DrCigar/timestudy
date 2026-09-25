@@ -50,9 +50,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File render-sheet.ps1
 1. Import the repo in Vercel. Framework preset: Other. No build command; the root `index.html` and `api/` are deployed as they are.
 2. In the project, open Storage and attach **Neon** from the Marketplace. This creates the database and sets `DATABASE_URL` for the project.
 3. Redeploy. The API creates its two tables on first request.
-4. Open the site, click the gear, and set the results password. Whoever knows the password can open the averages, export the CSV, remove entries, and change the password.
+4. Open the site, click the gear, and set the results password. Whoever knows the password can open the averages, export the CSV, edit or remove entries, and change the password.
 
-On Vercel the password does more than hide a tab: `GET /api/studies` and `DELETE` require the unlocked hash in the `x-results-key` header, so results are not readable without it. Adding a study (`POST`) is open to anyone with the URL, which is the point of the page.
+On Vercel the password does more than hide a tab: `GET`, `PUT`, and `DELETE` on `/api/studies` require the unlocked hash in the `x-results-key` header, so results are not readable or changeable without it. Adding a study (`POST`) is open to anyone with the URL, which is the point of the page.
 
 **Data.** One document per saved study in collection `studies`:
 
@@ -61,6 +61,8 @@ On Vercel the password does more than hide a tab: `GET /api/studies` and `DELETE
   "minutes": { "checkin": 10, "brain": 15 }, "notes": { "term": "Merchant moved it twice" },
   "hands": 180, "wait": 95, "total": 275, "uid": "u_…", "createdAt": "2026-09-21T18:00:00Z", "v": 1 }
 ```
+
+**Editing an entry.** In the saved-studies list on the averages view, Edit loads that study into the form. Save changes writes back to the same record, keeping its id, creation time, and owner, and adds `updatedAt`. The Steps column in that list shows how many of the steps carry a time, which is the quickest way to spot an unfinished entry.
 
 **Password gate.** Team averages open from the gear icon. Only a SHA-256 hash of the password is ever stored (artifact: document `config/gate`; Vercel: table `gate`). Installers who unlock stay unlocked for the browser session. On the artifact, page editors bypass the gate and set the password; the gate hides results in the page but any signed-in org member could read the shared store directly. On Vercel, the API enforces it.
 

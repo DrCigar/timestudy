@@ -244,6 +244,7 @@
     <div class="actions">
       <button class="btn primary" id="b-save">Save to team data</button>
       <button class="btn" id="b-new" hidden>Start a new study</button>
+      <button class="btn" id="b-cancel-edit" hidden>Cancel edit</button>
       <button class="btn" id="b-copy">Copy summary for Slack</button>
       <button class="btn" id="b-reset">Clear</button>
       <span class="status" id="status"></span>
@@ -362,6 +363,7 @@
     add: doc => mode === 'claude' ? db.collection('studies').add(doc) : api('/studies', { method:'POST', body: JSON.stringify(doc) }),
     list: () => api('/studies'),
     remove: id => mode === 'claude' ? db.doc('studies/' + id).delete() : api('/studies?id=' + encodeURIComponent(id), { method:'DELETE' }),
+    update: (id, doc) => mode === 'claude' ? db.doc('studies/' + id).set(doc) : api('/studies?id=' + encodeURIComponent(id), { method:'PUT', body: JSON.stringify(doc) }),
     getGate: async () => { if (mode === 'claude') { const snap = await db.doc('config/gate').get(); return snap.exists ? (snap.data().hash || null) : null; } const g = await api('/gate'); gateSet = !!g.set; return null; },
     verify: async h => { if (mode === 'claude') return !!gateHash && h === gateHash; const g = await api('/gate', { method:'POST', body: JSON.stringify({ verify: h }) }); return !!g.ok; },
     setGate: h => mode === 'claude' ? db.doc('config/gate').set({ hash: h, updatedAt: new Date().toISOString() }) : api('/gate', { method:'POST', body: JSON.stringify({ set: h }) }),
@@ -386,12 +388,17 @@
   });
 
   // draft restore (per-device convenience only)
-  try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
-    document.querySelectorAll('[data-min]').forEach(i => { const v = d.min?.[i.dataset.min]; if (v != null && v !== '') i.value = v; });
-    document.querySelectorAll('[data-note]').forEach(i => { const v = d.note?.[i.dataset.note]; if (v) i.value = v; });
-    document.querySelectorAll('[data-key]').forEach(i => { const v = d.meta?.[i.dataset.key]; if (v) i.value = v; });
-  }} catch(e){}
-  if (!$('#m-date').value) $('#m-date').value = new Date().toISOString().slice(0,10);
+  function clearForm(){ document.querySelectorAll('#view-log .row input, #view-log .meta input, #view-log .meta select').forEach(i => i.value = ''); }
+  function restoreDraft(){
+    clearForm();
+    try { const d = JSON.parse(localStorage.getItem(DRAFT) || 'null'); if (d) {
+      document.querySelectorAll('[data-min]').forEach(i => { const v = d.min?.[i.dataset.min]; if (v != null && v !== '') i.value = v; });
+      document.querySelectorAll('[data-note]').forEach(i => { const v = d.note?.[i.dataset.note]; if (v) i.value = v; });
+      document.querySelectorAll('[data-key]').forEach(i => { const v = d.meta?.[i.dataset.key]; if (v) i.value = v; });
+    }} catch(e){}
+    if (!$('#m-date').value) $('#m-date').value = new Date().toISOString().slice(0,10);
+  }
+  restoreDraft();
 
   const minutesOf = id => { const n = parseFloat($(`[data-min="${id}"]`).value); return isNaN(n) || n < 0 ? 0 : n; };
   function readForm(){
@@ -420,7 +427,7 @@
     document.querySelectorAll('[data-key]').forEach(i => { if (i.value) s.meta[i.dataset.key] = i.value; });
     try { localStorage.setItem(DRAFT, JSON.stringify(s)); } catch(e){}
   }
-  $('#view-log').addEventListener('input', () => { compute(); clearTimeout(saveT); saveT = setTimeout(saveDraft, 300); });
+  $('#view-log').addEventListener('input', () => { compute(); if (editingId) return; clearTimeout(saveT); saveT = setTimeout(saveDraft, 300); });
   compute();
 
   // ---------- submitted state: one save per study ----------
@@ -450,6 +457,27 @@
     const d = $('#thanks'); if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open','');
   }
   if (submitted) lockForm(true);
+
+  // ---------- edit an existing study ----------
+  let editingId = null, editingEntry = null;
+  function beginEdit(e){
+    editingId = e.id; editingEntry = e;
+    clearForm();
+    $('#m-name').value = e.name || ''; $('#m-date').value = e.date || (e.createdAt || '').slice(0,10); $('#m-exp').value = e.exp || ''; $('#m-store').value = e.store || '';
+    STEPS.forEach(st => { const m = e.minutes?.[st.id]; if (m != null && m !== '') $(`[data-min="${st.id}"]`).value = m; const n = e.notes?.[st.id]; if (n) $(`[data-note="${st.id}"]`).value = n; });
+    lockForm(false);
+    const save = $('#b-save'); save.disabled = false; save.textContent = 'Save changes';
+    $('#b-cancel-edit').hidden = false; $('#b-new').hidden = true; $('#b-reset').hidden = true;
+    notice(`<div><b>Editing ${esc(e.name || 'this installer')}'s study${e.date ? ' from ' + esc(e.date) : ''}.</b> Fill in what is missing or fix what is wrong. Save changes updates the existing entry; nothing else is touched.</div>`);
+    $('#view-log').hidden = false; $('#view-sum').hidden = true; compute(); window.scrollTo({ top: 0 });
+  }
+  function endEdit(){
+    editingId = null; editingEntry = null;
+    $('#b-cancel-edit').hidden = true; notice('');
+    restoreDraft(); compute();
+    if (submitted) lockForm(true); else lockForm(false);
+  }
+  $('#b-cancel-edit').onclick = () => { endEdit(); if (unlocked || isAdmin) show('sum'); };
 
   // ---------- views + password gate ----------
   const GATE_KEY = 'pos360-ts-unlock';
@@ -528,8 +556,21 @@
   async function copy(text){ try { await navigator.clipboard.writeText(text); toast('Copied. Paste it into the Deployments Slack channel.'); } catch(e){ prompt('Copy this summary:', text); } }
 
   $('#b-save').onclick = async () => {
-    if (submitting || submitted) return;
+    if (submitting || (submitted && !editingId)) return;
     const f = readForm();
+    if (editingId) {
+      if (!f.name) { toast('The study needs a name.'); $('#m-name').focus(); return; }
+      const btn = $('#b-save'); submitting = true; btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        const id = editingId, prev = editingEntry || {};
+        await store.update(id, { ...f, uid: prev.uid || null, createdAt: prev.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString(), v: 1 });
+        if (mode === 'rest') await refresh(); else { const i = entries.findIndex(x => x.id === id); if (i >= 0) entries[i] = { ...entries[i], ...f, updatedAt: new Date().toISOString() }; }
+        toast('Changes saved to the existing entry.');
+        endEdit(); show('sum');
+      } catch(e) { toast(e && e.code === 'locked' ? 'Unlock the results to edit entries.' : 'Could not save the changes right now.'); btn.disabled = false; btn.textContent = 'Save changes'; }
+      finally { submitting = false; }
+      return;
+    }
     if (!f.name) { toast('Add your name first so the team knows whose numbers these are.'); $('#m-name').focus(); return; }
     if (Object.keys(f.minutes).length < 5) { toast('Fill in at least a handful of steps before saving.'); return; }
     if (mode === 'preview') { toast(window.__storageError ? 'Storage is not connected on this host yet. Your numbers are kept on this device.' : 'Saving is not available on this copy of the page. Your numbers are kept on this device.'); return; }
@@ -632,11 +673,12 @@
       <div class="grid2">
         <div class="card"><h3>What slows it down</h3><div class="hint">Notes installers left on individual steps.</div>
           ${notes.length ? `<ul class="notes">${notes.slice(0,40).map(n=>`<li><span class="st">${esc(n.step)}</span>${esc(n.v)} <span class="by">· ${esc(n.by)}</span></li>`).join('')}</ul>` : `<p class="hint">No notes yet.</p>`}</div>
-        <div class="card"><h3>Saved studies</h3><div class="hint">Newest first.${isAdmin ? ' You can remove any entry.' : ' You can remove your own.'}</div>
-          <div class="tbl-wrap"><table class="entries"><thead><tr><th>Date</th><th>Installer</th><th>Experience</th><th class="r">Total</th><th class="r">Hands-on</th><th class="r">Waiting</th><th></th></tr></thead><tbody>
-          ${list.slice(0,60).map(e => `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(e.total)}</b></td><td class="r num">${fmt(e.hands)}</td><td class="r num">${fmt(e.wait)}</td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`).join('')}
+        <div class="card"><h3>Saved studies</h3><div class="hint">Newest first. The Steps column shows how many of the ${STEPS.length} steps have a time; a low count usually means an unfinished entry.${isAdmin ? ' You can edit or remove any entry.' : ' You can edit or remove your own.'}</div>
+          <div class="tbl-wrap"><table class="entries"><thead><tr><th>Date</th><th>Installer</th><th>Experience</th><th class="r">Total</th><th class="r">Hands-on</th><th class="r">Waiting</th><th class="r">Steps</th><th></th></tr></thead><tbody>
+          ${list.slice(0,60).map(e => `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(e.total)}</b></td><td class="r num">${fmt(e.hands)}</td><td class="r num">${fmt(e.wait)}</td><td class="r num" title="Steps with a time entered">${Object.values(e.minutes||{}).filter(v => Number(v) > 0).length}<span style="color:var(--muted)">/${STEPS.length}</span></td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-edit="${esc(e.id)}">Edit</button> <button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`).join('')}
           </tbody></table></div></div>
       </div>`;
+    body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { const e = entries.find(x => x.id === b.dataset.edit); if (e) beginEdit(e); });
     body.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       if (!confirm('Remove this study from the team data?')) return;
       try { await store.remove(b.dataset.del); toast('Removed.'); if (mode === 'rest') refresh(); } catch(e){ toast('Could not remove it right now.'); }
