@@ -18,17 +18,17 @@ The rows mirror the 360 Pro quick install card.
 
 - **Arrive and document**: check in, photos and video, unbox and stage
 - **Wire it**: steps 1 to 8 from the card, plus waiting for online confirmation
-- **Data transfer**: data pull and data conversion run in the **background** and do not add to time on site; a third row, idle during data transfer, captures the minutes the installer was actually stuck, and that counts as waiting
+- **Data transfer**: data pull and data conversion run in the **background** and do not add to time on site; a standard 10 minutes of idle time is counted as waiting for every study that had a transfer
 - **Prove it works**: scan 20 items, one-cent sale and void, backup internet test, fix anything that failed
 - **Go live**: merchant batches the old terminal (waiting), switch to live and remove the old hardware
 - **Close out**: merchant walkthrough, Digital QC Sheet and photos, checkout notes
 - **Miscellaneous, across the visit**: customer traffic, merchant questions, other interruptions (all counted as waiting or interrupted)
 
-Step ids: `checkin photos unbox · brain ups wake printer term lcd periph cables isp · pull convert idle · scan sale lte fixes · batch switch · walk qc notes · traffic mxq other`. Waiting-type ids: `isp idle batch traffic mxq other`. Background ids: `pull convert`.
+Step ids: `checkin photos unbox · brain ups wake printer term lcd periph cables isp · pull convert · scan sale lte fixes · batch switch · walk qc notes · traffic mxq other`. Waiting-type ids: `isp batch traffic mxq other`. Background ids: `pull convert`.
 
 ## Time on site model
 
-`time on site = hands-on + waiting`. Background steps never add to it; only the idle minutes during them do, as waiting. Studies saved with `model: 2` carry an explicit `idle` value. Older studies (no `model` field) counted data transfer as waiting; the recap now re-derives their totals from their step minutes and uses 10% of their transfer time as the idle estimate, marked with an asterisk in the saved-studies list and an "Idle estimated" column in the CSV. Editing an older entry prefills that estimate so it can be corrected. The recap never trusts the stored `total`, `hands`, or `wait` fields; it recomputes from `minutes` every time.
+`time on site = hands-on + waiting`. Background steps never add to it. Instead, a standard 10 minutes of idle time (`IDLE_STANDARD` in the source) is counted as waiting for every study that had a data transfer, old or new. The recap never trusts the stored `total`, `hands`, or `wait` fields; it recomputes from `minutes` every time, so studies saved under earlier models are corrected on the fly. Any `idle` value stored by the short-lived model 2 is ignored.
 
 ## Build
 
@@ -63,7 +63,7 @@ On Vercel the password does more than hide a tab: `GET`, `PUT`, and `DELETE` on 
 ```json
 { "name": "…", "date": "2026-09-21", "exp": "6 to 20", "store": "Liquor",
   "minutes": { "checkin": 10, "brain": 15 }, "notes": { "term": "Merchant moved it twice" },
-  "hands": 180, "wait": 20, "bg": 90, "total": 200, "model": 2, "uid": "u_…", "createdAt": "2026-09-21T18:00:00Z", "v": 1 }
+  "hands": 180, "wait": 20, "bg": 90, "total": 200, "model": 3, "uid": "u_…", "createdAt": "2026-09-21T18:00:00Z", "v": 1 }
 ```
 
 **Editing an entry.** In the saved-studies list on the averages view, Edit loads that study into the form. Save changes writes back to the same record, keeping its id, creation time, and owner, and adds `updatedAt`. The Steps column in that list shows how many of the steps carry a time, which is the quickest way to spot an unfinished entry.

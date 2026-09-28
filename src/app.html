@@ -225,7 +225,7 @@
   <!-- ============ LOG ============ -->
   <section class="view" id="view-log">
     <div class="intro">
-      <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time spent waiting on someone else or dealing with interruptions. Data transfer runs in the background while you keep working, so only the minutes you were actually idle count. When you save, your numbers join the team's and the averages update for everyone.</p>
+      <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time spent waiting on someone else or dealing with interruptions. Data transfer runs in the background while you keep working, so a standard 10 minutes of idle time counts instead of its full duration. When you save, your numbers join the team's and the averages update for everyone.</p>
       <div class="meta">
         <div><label for="m-name">Installer</label><input id="m-name" data-key="name" placeholder="Your name" autocomplete="name"></div>
         <div><label for="m-date">Date</label><input id="m-date" data-key="date" type="date"></div>
@@ -322,8 +322,7 @@
     ]},
     { id:'data', n:'', title:'Data transfer', steps:[
       { id:'pull',    name:'Data pull from the old register', sub:'How long it runs. The Data Transfer Team works the old system while you keep going', type:'bg' },
-      { id:'convert', name:'Data conversion', sub:'How long it runs, until the converted database lands', type:'bg' },
-      { id:'idle',    name:'Idle during data transfer', sub:'Of that time, the minutes you were stuck with nothing else to do. This is what counts', type:'wait' },
+      { id:'convert', name:'Data conversion', sub:'How long it runs, until the converted database lands. A standard 10 idle minutes is counted for the transfer', type:'bg' },
     ]},
     { id:'test', n:'', title:'Prove it works', steps:[
       { id:'scan',    name:'Scan 20 items and check pricing' },
@@ -408,16 +407,15 @@
   restoreDraft();
 
   // Time-on-site model. Hands-on and waiting add up; background steps (data transfer) run while the crew keeps
-  // working, so they never add to the total. Only the idle minutes during them count, as waiting. Studies saved
-  // before this model (no "model" field) get an idle estimate of 10% of their transfer time.
-  const IDLE_ESTIMATE = 0.10, MODEL = 2;
+  // working, so their duration never adds to the total. Instead a standard IDLE_STANDARD minutes of idle time is
+  // counted as waiting for every study that had a transfer. Applies to every study, old or new; stored totals are
+  // never trusted, everything is re-derived from step minutes.
+  const IDLE_STANDARD = 10, MODEL = 3;
   function derive(minutes, model){
     minutes = minutes || {}; let hands = 0, wait = 0, bg = 0;
     STEPS.forEach(st => { const m = Number(minutes[st.id]) || 0; if (m <= 0) return; if (st.type === 'bg') bg += m; else if (st.type === 'wait') wait += m; else hands += m; });
-    let idleEstimated = false, idle = Number(minutes.idle) || 0;
-    const ver = Number(model) || 1; // studies saved before the model field are version 1
-    if (ver < MODEL && bg > 0 && !(Number(minutes.idle) > 0)) { idle = Math.round(bg * IDLE_ESTIMATE); wait += idle; idleEstimated = true; }
-    return { hands, wait, bg, idle, total: hands + wait, idleEstimated };
+    const idle = bg > 0 ? IDLE_STANDARD : 0; wait += idle;
+    return { hands, wait, bg, idle, total: hands + wait };
   }
   const minutesOf = id => { const n = parseFloat($(`[data-min="${id}"]`).value); return isNaN(n) || n < 0 ? 0 : n; };
   function readForm(){
@@ -429,11 +427,11 @@
   function phaseSplit(minutes, model){
     const d = derive(minutes, model);
     return PHASES.map(ph => { let h=0,w=0,b=0; ph.steps.forEach(s => { const m = Number(minutes?.[s.id])||0; if (m<=0) return; if (s.type==='wait') w+=m; else if (s.type==='bg') b+=m; else h+=m; });
-      if (ph.id === 'data' && d.idleEstimated) w += d.idle; return { id: ph.id, title: ph.title, h, w, b }; });
+      if (ph.id === 'data') w += d.idle; return { id: ph.id, title: ph.title, h, w, b }; });
   }
   function compute(){
     const f = readForm(); const per = phaseSplit(f.minutes, MODEL);
-    per.forEach(p => { $(`[data-sub="${p.id}"]`).textContent = p.b ? `${fmt(p.w)} idle counted · ${fmt(p.b)} in the background` : fmt(p.h + p.w); });
+    per.forEach(p => { $(`[data-sub="${p.id}"]`).textContent = p.b ? `${fmt(p.w)} standard idle counted · ${fmt(p.b)} in the background` : fmt(p.h + p.w); });
     $('#t-hours').textContent = Math.floor(f.total/60); $('#t-mins').textContent = Math.round(f.total%60);
     $('#t-hands').textContent = fmt(f.hands); $('#t-wait').textContent = fmt(f.wait); $('#t-bg').textContent = fmt(f.bg);
     $('#bars').innerHTML = barsHTML(per, f.total, f.bg);
@@ -443,7 +441,7 @@
     const max = Math.max(1, ...per.map(p => p.h + p.w));
     return per.map(p => { const t = p.h+p.w, pct = total ? Math.round(t/total*100) : 0;
       return `<div class="bar"><div>${esc(p.title)}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v num">${pct}%</div></div>`; }).join('')
-      + (bg ? `<div class="bgline">Data transfer runs for ${fmt(bg)} in the background and is not counted. Only idle minutes during it are.</div>` : '');
+      + (bg ? `<div class="bgline">Data transfer runs for ${fmt(bg)} in the background and is not counted. A standard ${IDLE_STANDARD} min of idle time is.</div>` : '');
   }
   let saveT;
   function saveDraft(){
@@ -491,7 +489,6 @@
     clearForm();
     $('#m-name').value = e.name || ''; $('#m-date').value = e.date || (e.createdAt || '').slice(0,10); $('#m-exp').value = e.exp || ''; $('#m-store').value = e.store || '';
     STEPS.forEach(st => { const m = e.minutes?.[st.id]; if (m != null && m !== '') $(`[data-min="${st.id}"]`).value = m; const n = e.notes?.[st.id]; if (n) $(`[data-note="${st.id}"]`).value = n; });
-    { const d = derive(e.minutes, e.model); if (d.idleEstimated) $('[data-min="idle"]').value = d.idle; }
     lockForm(false);
     const save = $('#b-save'); save.disabled = false; save.textContent = 'Save changes';
     $('#b-cancel-edit').hidden = false; $('#b-new').hidden = true; $('#b-reset').hidden = true;
@@ -576,7 +573,7 @@
     const f = compute(); const per = phaseSplit(f.minutes, MODEL);
     const lines = [`*360 Pro install time study* · ${f.name || 'Installer'}${f.exp ? ` · ${f.exp} installs` : ''}${f.store ? ` · ${f.store}` : ''}`,
       `Typical time on site, 1 station: *${fmt(f.total)}* (hands-on ${fmt(f.hands)}, waiting ${fmt(f.wait)})`,
-      f.bg ? `Data transfer ran alongside for ${fmt(f.bg)}; only ${fmt(derive(f.minutes, MODEL).idle)} idle counted` : '', ''];
+      f.bg ? `Data transfer ran alongside for ${fmt(f.bg)}; a standard ${IDLE_STANDARD} min idle counted` : '', ''];
     per.forEach(p => { const t = p.h + p.w; if (t || p.b) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}${p.b ? ` · ${fmt(p.b)} in the background` : ''}`); });
     const notes = Object.entries(f.notes).map(([id, v]) => `• ${STEP[id].name}: ${v}`); if (notes.length) lines.push('', '*What slows it down*', ...notes);
     await copy(lines.join('\n'));
@@ -622,7 +619,7 @@
     { name:'Example A', exp:'50 or more', store:'Liquor', minutes:{checkin:10,photos:10,unbox:15,brain:10,ups:5,wake:10,printer:10,term:15,lcd:10,periph:15,cables:20,isp:10,pull:45,convert:30,scan:20,sale:10,lte:10,fixes:15,batch:15,switch:20,walk:20,qc:15,lead:15,notes:10,traffic:15,mxq:20,other:5} },
     { name:'Example B', exp:'6 to 20', store:'Convenience', minutes:{checkin:15,photos:15,unbox:20,brain:15,ups:5,wake:15,printer:15,term:25,lcd:15,periph:20,cables:30,isp:15,pull:60,convert:45,scan:30,sale:15,lte:15,fixes:30,batch:20,switch:25,walk:25,qc:20,lead:25,notes:15,traffic:25,mxq:30,other:10} },
     { name:'Example C', exp:'1 to 5', store:'Smoke shop', minutes:{checkin:15,photos:20,unbox:25,brain:20,ups:10,wake:20,printer:20,term:30,lcd:20,periph:25,cables:40,isp:20,pull:60,convert:60,scan:40,sale:20,lte:20,fixes:45,batch:30,switch:30,walk:30,qc:25,lead:30,notes:20,traffic:30,mxq:45,other:15} },
-  ].map((e, i) => { e.minutes.idle = [5, 10, 20][i]; const d = derive(e.minutes, MODEL); return {...e, hands:d.hands, wait:d.wait, bg:d.bg, total:d.total, model:MODEL, notes:{}, date:'', example:true}; });
+  ].map((e, i) => { const d = derive(e.minutes, MODEL); return {...e, hands:d.hands, wait:d.wait, bg:d.bg, total:d.total, model:MODEL, notes:{}, date:'', example:true}; });
   let showExamples = false;
 
   async function refresh(){
@@ -652,9 +649,8 @@
     const splits = list.map(e => phaseSplit(e.minutes, e.model));
     const phase = PHASES.map((ph, i) => ({ id: ph.id, title: ph.title, h: mean(splits.map(sp => sp[i].h)), w: mean(splits.map(sp => sp[i].w)), b: mean(splits.map(sp => sp[i].b)) }));
     const totals = derived.map(d => d.total), hands = derived.map(d => d.hands), waits = derived.map(d => d.wait), bgs = derived.map(d => d.bg), idles = derived.map(d => d.idle);
-    const estimated = derived.filter(d => d.idleEstimated).length;
     const people = new Set(list.map(e => (e.name||'').trim().toLowerCase()).filter(Boolean)).size;
-    return { step, phase, derived, n:list.length, people, estimated, avgTotal:mean(totals), medTotal:median(totals), avgHands:mean(hands), avgWait:mean(waits), avgBg:mean(bgs), avgIdle:mean(idles), minTotal: totals.length?Math.min(...totals):0, maxTotal: totals.length?Math.max(...totals):0 };
+    return { step, phase, derived, n:list.length, people, avgTotal:mean(totals), medTotal:median(totals), avgHands:mean(hands), avgWait:mean(waits), avgBg:mean(bgs), avgIdle:mean(idles), minTotal: totals.length?Math.min(...totals):0, maxTotal: totals.length?Math.max(...totals):0 };
   }
 
   let lastStats = null;
@@ -693,7 +689,7 @@
         <div class="kpi"><div class="lbl">Waiting or interrupted</div><div class="n num">${fmt(S.avgWait)}</div><div class="sub2">${S.avgTotal ? Math.round(S.avgWait/S.avgTotal*100) : 0}% of the visit</div></div>
         <div class="kpi"><div class="lbl">Studies</div><div class="n num">${S.n}<small>from ${S.people} ${S.people===1?'installer':'installers'}</small></div><div class="sub2">${fexp ? `Filtered to ${esc(fexp)} installs` : 'All experience levels'}</div></div>
       </div>
-      ${S.avgBg ? `<div class="bgnote"><b>Data transfer averages ${fmt(S.avgBg)} per install and is not counted in time on site.</b> It runs in the background while the crew keeps working. Only the idle minutes during it count, averaging ${fmt(S.avgIdle)}.${S.estimated ? ` ${S.estimated} older ${S.estimated===1?'study has':'studies have'} no idle figure, so 10% of their transfer time is used as the estimate.` : ''}</div>` : ''}
+      ${S.avgBg ? `<div class="bgnote"><b>Data transfer averages ${fmt(S.avgBg)} per install and is not counted in time on site.</b> It runs in the background while the crew keeps working. A standard ${IDLE_STANDARD} minutes of idle time is counted as waiting for every install that had a transfer.</div>` : ''}
       <div class="grid2">
         <div class="card"><h3>Where the time goes</h3><div class="hint">Average minutes per phase. Vermilion is hands-on, gray is waiting.</div>${barsHTML(S.phase, S.avgTotal, S.avgBg)}</div>
         <div class="card"><h3>Biggest time sinks</h3><div class="hint">Average minutes per step, hands-on and waiting.</div>
@@ -707,7 +703,7 @@
           ${notes.length ? `<ul class="notes">${notes.slice(0,40).map(n=>`<li><span class="st">${esc(n.step)}</span>${esc(n.v)} <span class="by">· ${esc(n.by)}</span></li>`).join('')}</ul>` : `<p class="hint">No notes yet.</p>`}</div>
         <div class="card"><h3>Saved studies</h3><div class="hint">Newest first. The Steps column shows how many of the ${STEPS.length} steps have a time; a low count usually means an unfinished entry.${isAdmin ? ' You can edit or remove any entry.' : ' You can edit or remove your own.'}</div>
           <div class="tbl-wrap"><table class="entries"><thead><tr><th>Date</th><th>Installer</th><th>Experience</th><th class="r">Total</th><th class="r">Hands-on</th><th class="r">Waiting</th><th class="r">Steps</th><th></th></tr></thead><tbody>
-          ${list.slice(0,60).map((e, i) => { const d = derive(e.minutes, e.model); return `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(d.total)}</b>${d.idleEstimated ? '<span style="color:var(--muted)" title="Idle time estimated at 10% of data transfer">*</span>' : ''}</td><td class="r num">${fmt(d.hands)}</td><td class="r num">${fmt(d.wait)}</td><td class="r num" title="Steps with a time entered">${Object.values(e.minutes||{}).filter(v => Number(v) > 0).length}<span style="color:var(--muted)">/${STEPS.length}</span></td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-edit="${esc(e.id)}">Edit</button> <button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`; }).join('')}
+          ${list.slice(0,60).map((e, i) => { const d = derive(e.minutes, e.model); return `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(d.total)}</b></td><td class="r num">${fmt(d.hands)}</td><td class="r num">${fmt(d.wait)}</td><td class="r num" title="Steps with a time entered">${Object.values(e.minutes||{}).filter(v => Number(v) > 0).length}<span style="color:var(--muted)">/${STEPS.length}</span></td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-edit="${esc(e.id)}">Edit</button> <button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`; }).join('')}
           </tbody></table></div></div>
       </div>`;
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { const e = entries.find(x => x.id === b.dataset.edit); if (e) beginEdit(e); });
@@ -724,7 +720,7 @@
     const S = lastStats; const fexp = $('#f-exp').value;
     const lines = [`*360 Pro install time study, team averages*${fexp ? ` · ${fexp} installs` : ''} · ${S.n} ${S.n===1?'study':'studies'} from ${S.people} ${S.people===1?'installer':'installers'}`,
       `Average time on site, 1 station: *${fmt(S.avgTotal)}* (hands-on ${fmt(S.avgHands)}, waiting ${fmt(S.avgWait)}) · median ${fmt(S.medTotal)}`,
-      S.avgBg ? `Data transfer runs alongside for ${fmt(S.avgBg)} on average and is not counted; idle time during it averages ${fmt(S.avgIdle)}` : '', ''];
+      S.avgBg ? `Data transfer runs alongside for ${fmt(S.avgBg)} on average and is not counted; a standard ${IDLE_STANDARD} min of idle time is` : '', ''];
     S.phase.forEach(p => { const t = p.h+p.w; if (t || p.b) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}${p.b ? ` · ${fmt(p.b)} in the background` : ''}`); });
     const top = [...S.step].filter(s=>s.n).sort((a,b)=>b.avg-a.avg).slice(0,5);
     if (top.length) lines.push('', '*Biggest time sinks*', ...top.map(s => `• ${s.name}: ${Math.round(s.avg)} min avg (${s.min} to ${s.max}, n=${s.n})`));
@@ -732,8 +728,8 @@
   };
   $('#b-export').onclick = async () => {
     if (!downloads && mode !== 'rest') return;
-    const head = ['Date','Installer','Installs completed','Store type','Time on site min','Hands-on min','Waiting min','Data transfer background min','Idle during transfer min','Idle estimated', ...STEPS.map(s => s.name), ...STEPS.map(s => 'Note: ' + s.name)];
-    const rows = entries.map(e => { const d = derive(e.minutes, e.model); return [e.date, e.name, e.exp, e.store, d.total, d.hands, d.wait, d.bg, d.idle, d.idleEstimated ? 'yes' : '', ...STEPS.map(s => e.minutes?.[s.id] ?? ''), ...STEPS.map(s => e.notes?.[s.id] ?? '')]; });
+    const head = ['Date','Installer','Installs completed','Store type','Time on site min','Hands-on min','Waiting min','Data transfer background min','Standard idle min counted', ...STEPS.map(s => s.name), ...STEPS.map(s => 'Note: ' + s.name)];
+    const rows = entries.map(e => { const d = derive(e.minutes, e.model); return [e.date, e.name, e.exp, e.store, d.total, d.hands, d.wait, d.bg, d.idle, ...STEPS.map(s => e.minutes?.[s.id] ?? ''), ...STEPS.map(s => e.notes?.[s.id] ?? '')]; });
     const csv = [head, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
     const filename = `360pro-time-studies-${new Date().toISOString().slice(0,10)}.csv`;
     if (downloads) { try { await downloads.save({ filename, data: csv }); } catch(e){ if (!(e && e.code === 'cancelled')) toast('The download did not go through.'); } return; }

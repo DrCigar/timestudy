@@ -129,7 +129,7 @@
   </header>
 
   <section class="intro">
-    <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time you spend waiting on someone else or handling interruptions. Data transfer runs in the background while you keep working, so only the minutes you were actually idle count. Totals update as you type, and the sheet remembers your numbers on this device.</p>
+    <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time you spend waiting on someone else or handling interruptions. Data transfer runs in the background while you keep working, so a standard 10 minutes of idle time counts instead of its full duration. Totals update as you type, and the sheet remembers your numbers on this device.</p>
     <div class="meta">
       <div><label for="m-name">Installer</label><input id="m-name" data-key="name" placeholder="Your name"></div>
       <div><label for="m-date">Date</label><input id="m-date" data-key="date" type="date"></div>
@@ -191,8 +191,7 @@
     ]},
     { id:'data', n:'', title:'Data transfer', steps:[
       { id:'pull',    name:'Data pull from the old register', sub:'How long it runs while you keep working', type:'bg' },
-      { id:'convert', name:'Data conversion', sub:'How long it runs, until the converted database lands', type:'bg' },
-      { id:'idle',    name:'Idle during data transfer', sub:'Of that time, the minutes you were stuck with nothing else to do', type:'wait' },
+      { id:'convert', name:'Data conversion', sub:'How long it runs. A standard 10 idle minutes is counted for the transfer', type:'bg' },
     ]},
     { id:'test', n:'', title:'Prove it works', steps:[
       { id:'scan',    name:'Scan 20 items and check pricing' },
@@ -252,8 +251,9 @@
     PHASES.forEach(ph => {
       let h = 0, w = 0, b = 0;
       ph.steps.forEach(st => { const m = minutesOf(st.id); if (st.type === 'wait') w += m; else if (st.type === 'bg') b += m; else h += m; });
+      if (b > 0) w += 10; // standard idle time counted for a data transfer
       per.push({ title: ph.title, h, w, b }); hands += h; wait += w; bg += b;
-      document.querySelector(`[data-sub="${ph.id}"]`).textContent = b ? `${fmt(w)} idle counted · ${fmt(b)} in the background` : fmt(h + w);
+      document.querySelector(`[data-sub="${ph.id}"]`).textContent = b ? `${fmt(w)} standard idle counted · ${fmt(b)} in the background` : fmt(h + w);
     });
     const total = hands + wait;
     $('#t-hours').textContent = Math.floor(total/60);
@@ -265,7 +265,7 @@
     $('#bars').innerHTML = per.map(p => {
       const t = p.h + p.w, pct = total ? Math.round(t / total * 100) : 0;
       return `<div class="bar"><div>${p.title}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v">${pct}%</div></div>`;
-    }).join('') + (bg ? `<div class="bar bgline">Data transfer runs for ${fmt(bg)} in the background and is not counted. Only idle minutes during it are.</div>` : '');
+    }).join('') + (bg ? `<div class="bar bgline">Data transfer runs for ${fmt(bg)} in the background and is not counted. A standard 10 min of idle time is.</div>` : '');
     return { hands, wait, bg, total, per };
   }
 
@@ -287,7 +287,7 @@
     const r = compute(); const name = $('#m-name').value || 'Installer'; const exp = $('#m-exp').value; const store = $('#m-store').value;
     const lines = [`*360 Pro install time study* · ${name}${exp ? ` · ${exp} installs` : ''}${store ? ` · ${store}` : ''}`,
       `Typical time on site, 1 station: *${fmt(r.total)}* (hands-on ${fmt(r.hands)}, waiting ${fmt(r.wait)})`,
-      r.bg ? `Data transfer ran alongside for ${fmt(r.bg)}; only idle minutes counted` : '', ''];
+      r.bg ? `Data transfer ran alongside for ${fmt(r.bg)}; a standard 10 min idle counted` : '', ''];
     r.per.forEach(p => { const t = p.h + p.w; if (t || p.b) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}${p.b ? ` · ${fmt(p.b)} in the background` : ''}`); });
     const notes = []; document.querySelectorAll('[data-note]').forEach(i => { if (i.value.trim()) { const id = i.dataset.note; const st = PHASES.flatMap(p => p.steps).find(s => s.id === id); notes.push(`• ${st.name}: ${i.value.trim()}`); } });
     if (notes.length) lines.push('', '*What slows it down*', ...notes);
