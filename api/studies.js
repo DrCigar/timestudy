@@ -24,7 +24,7 @@ export default async function handler(req, res) {
         name: String(b.name || '').slice(0, 80), date: String(b.date || '').slice(0, 10), exp: String(b.exp || '').slice(0, 20), store: String(b.store || '').slice(0, 80),
         minutes: Object.fromEntries(Object.entries(b.minutes).filter(([k, v]) => /^[a-z]{1,16}$/.test(k) && Number.isFinite(Number(v)) && Number(v) >= 0).map(([k, v]) => [k, Number(v)])),
         notes: Object.fromEntries(Object.entries(b.notes || {}).filter(([k, v]) => /^[a-z]{1,16}$/.test(k) && typeof v === 'string' && v).map(([k, v]) => [k, v.slice(0, 300)])),
-        hands: Number(b.hands) || 0, wait: Number(b.wait) || 0, total: Number(b.total) || 0,
+        hands: Number(b.hands) || 0, wait: Number(b.wait) || 0, bg: Number(b.bg) || 0, total: Number(b.total) || 0, model: Number(b.model) || 1,
         uid: b.uid ? String(b.uid).slice(0, 80) : null, createdAt: new Date().toISOString(), v: 1,
       };
       if (req.method === 'PUT') {

@@ -80,6 +80,12 @@
   .legend{ display:flex; gap:20px; align-items:center; font-size:13px; color:var(--muted); margin:6px 0 10px; flex-wrap:wrap; }
   .sw{ display:inline-block; width:12px; height:12px; border-radius:2px; vertical-align:-1px; margin-right:6px; }
   .sw.hands{ background:var(--verm); } .sw.wait{ background:var(--wait); }
+  .sw.bg, .row.bg .name .k, .steps-tbl tr.bg .k{ background:repeating-linear-gradient(45deg, var(--wait) 0 2px, transparent 2px 5px); border:1px solid var(--wait); box-sizing:border-box; }
+  .steps-tbl tr.bg .trk i{ background:repeating-linear-gradient(45deg, var(--wait) 0 3px, transparent 3px 6px); }
+  .steps-tbl tr.bg td:first-child::after{ content:" · background"; color:var(--muted); font-size:12px; }
+  .bgline{ font-size:12.5px; color:var(--muted); margin-top:10px; padding-top:8px; border-top:1px solid var(--line2); }
+  .bgnote{ background:var(--surface); border-left:4px solid var(--wait); padding:12px 16px; font-size:14px; margin-top:12px; }
+  .bgnote b{ color:var(--text); }
 
   .phase{ background:var(--surface); margin-top:14px; padding:14px 16px 10px; border-top:3px solid var(--ink); }
   .phase-h{ display:grid; grid-template-columns:1fr 120px 2fr; gap:14px; align-items:baseline; padding-bottom:8px; border-bottom:1.5px solid var(--text); }
@@ -219,7 +225,7 @@
   <!-- ============ LOG ============ -->
   <section class="view" id="view-log">
     <div class="intro">
-      <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time spent waiting on someone else or dealing with interruptions. When you save, your numbers join the team's and the averages update for everyone.</p>
+      <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time spent waiting on someone else or dealing with interruptions. Data transfer runs in the background while you keep working, so only the minutes you were actually idle count. When you save, your numbers join the team's and the averages update for everyone.</p>
       <div class="meta">
         <div><label for="m-name">Installer</label><input id="m-name" data-key="name" placeholder="Your name" autocomplete="name"></div>
         <div><label for="m-date">Date</label><input id="m-date" data-key="date" type="date"></div>
@@ -229,14 +235,14 @@
       </div>
     </div>
 
-    <div class="legend"><span><i class="sw hands"></i>Hands-on time</span><span><i class="sw wait"></i>Waiting or interrupted</span><span style="margin-left:auto">Minutes. Whole numbers are fine.</span></div>
+    <div class="legend"><span><i class="sw hands"></i>Hands-on time</span><span><i class="sw wait"></i>Waiting or interrupted</span><span><i class="sw bg"></i>Runs in the background, not counted</span><span style="margin-left:auto">Minutes. Whole numbers are fine.</span></div>
     <div id="phases"></div>
 
     <div class="totals">
       <div class="big">
         <div class="lbl">Your typical time on site, one station</div>
         <div class="n num"><span id="t-hours">0</span><small>hr</small><span id="t-mins">0</span><small>min</small></div>
-        <div class="split"><span>Hands-on <b id="t-hands" class="num">0 min</b></span><span>Waiting <b id="t-wait" class="num">0 min</b></span></div>
+        <div class="split"><span>Hands-on <b id="t-hands" class="num">0 min</b></span><span>Waiting <b id="t-wait" class="num">0 min</b></span><span>Data transfer alongside <b id="t-bg" class="num">0 min</b></span></div>
       </div>
       <div class="bars"><div class="lbl">Where your time goes</div><div id="bars"></div></div>
     </div>
@@ -315,8 +321,9 @@
       { id:'isp',     name:'Wait for online confirmation', sub:'Tech confirms store ISP and LTE', type:'wait' },
     ]},
     { id:'data', n:'', title:'Data transfer', steps:[
-      { id:'pull',    name:'Data pull from the old register', sub:'Data Transfer Team works the old system', type:'wait' },
-      { id:'convert', name:'Data conversion', sub:'Waiting for the converted database to land', type:'wait' },
+      { id:'pull',    name:'Data pull from the old register', sub:'How long it runs. The Data Transfer Team works the old system while you keep going', type:'bg' },
+      { id:'convert', name:'Data conversion', sub:'How long it runs, until the converted database lands', type:'bg' },
+      { id:'idle',    name:'Idle during data transfer', sub:'Of that time, the minutes you were stuck with nothing else to do. This is what counts', type:'wait' },
     ]},
     { id:'test', n:'', title:'Prove it works', steps:[
       { id:'scan',    name:'Scan 20 items and check pricing' },
@@ -376,8 +383,8 @@
     const sec = document.createElement('section'); sec.className = 'phase';
     sec.innerHTML = `<div class="phase-h"><h2>${ph.n ? `<span>${ph.n}</span>` : ''}${esc(ph.title)}</h2><div class="lbl" style="text-align:right;margin:0">Minutes</div><div class="lbl" style="margin:0">Notes, what makes it slow</div></div>`;
     ph.steps.forEach(st => {
-      const row = document.createElement('div'); row.className = 'row' + (st.type==='wait' ? ' wait' : '');
-      row.innerHTML = `<div class="name"><i class="k" title="${st.type==='wait'?'Waiting':'Hands-on'}"></i><div>${esc(st.name)}${st.sub ? `<small>${esc(st.sub)}</small>` : ''}</div></div>
+      const row = document.createElement('div'); row.className = 'row' + (st.type==='wait' ? ' wait' : st.type==='bg' ? ' bg' : '');
+      row.innerHTML = `<div class="name"><i class="k" title="${st.type==='wait'?'Waiting':st.type==='bg'?'Runs in the background':'Hands-on'}"></i><div>${esc(st.name)}${st.sub ? `<small>${esc(st.sub)}</small>` : ''}</div></div>
         <input class="min num" id="min-${st.id}" type="number" min="0" step="1" inputmode="numeric" placeholder="0" data-min="${st.id}" aria-label="Minutes for ${esc(st.name)}">
         <input class="note" id="note-${st.id}" type="text" placeholder="Optional" data-note="${st.id}" aria-label="Notes for ${esc(st.name)}">`;
       sec.appendChild(row);
@@ -400,24 +407,42 @@
   }
   restoreDraft();
 
+  // Time-on-site model. Hands-on and waiting add up; background steps (data transfer) run while the crew keeps
+  // working, so they never add to the total. Only the idle minutes during them count, as waiting. Studies saved
+  // before this model (no "model" field) get an idle estimate of 10% of their transfer time.
+  const IDLE_ESTIMATE = 0.10, MODEL = 2;
+  function derive(minutes, model){
+    minutes = minutes || {}; let hands = 0, wait = 0, bg = 0;
+    STEPS.forEach(st => { const m = Number(minutes[st.id]) || 0; if (m <= 0) return; if (st.type === 'bg') bg += m; else if (st.type === 'wait') wait += m; else hands += m; });
+    let idleEstimated = false, idle = Number(minutes.idle) || 0;
+    if (Number(model) < MODEL && bg > 0 && !(minutes.idle > 0)) { idle = Math.round(bg * IDLE_ESTIMATE); wait += idle; idleEstimated = true; }
+    return { hands, wait, bg, idle, total: hands + wait, idleEstimated };
+  }
   const minutesOf = id => { const n = parseFloat($(`[data-min="${id}"]`).value); return isNaN(n) || n < 0 ? 0 : n; };
   function readForm(){
-    const minutes = {}, notes = {}; let hands = 0, wait = 0;
-    STEPS.forEach(s => { const m = minutesOf(s.id); if (m) minutes[s.id] = m; if (s.type==='wait') wait += m; else hands += m; const nt = $(`[data-note="${s.id}"]`).value.trim(); if (nt) notes[s.id] = nt.slice(0, 300); });
-    return { name: $('#m-name').value.trim().slice(0,80), date: $('#m-date').value, exp: $('#m-exp').value, store: $('#m-store').value.trim().slice(0,80), minutes, notes, hands, wait, total: hands + wait };
+    const minutes = {}, notes = {};
+    STEPS.forEach(s => { const m = minutesOf(s.id); if (m) minutes[s.id] = m; const nt = $(`[data-note="${s.id}"]`).value.trim(); if (nt) notes[s.id] = nt.slice(0, 300); });
+    const d = derive(minutes, MODEL);
+    return { name: $('#m-name').value.trim().slice(0,80), date: $('#m-date').value, exp: $('#m-exp').value, store: $('#m-store').value.trim().slice(0,80), minutes, notes, hands: d.hands, wait: d.wait, bg: d.bg, total: d.total, model: MODEL };
+  }
+  function phaseSplit(minutes, model){
+    const d = derive(minutes, model);
+    return PHASES.map(ph => { let h=0,w=0,b=0; ph.steps.forEach(s => { const m = Number(minutes?.[s.id])||0; if (m<=0) return; if (s.type==='wait') w+=m; else if (s.type==='bg') b+=m; else h+=m; });
+      if (ph.id === 'data' && d.idleEstimated) w += d.idle; return { id: ph.id, title: ph.title, h, w, b }; });
   }
   function compute(){
-    const f = readForm(); const per = [];
-    PHASES.forEach(ph => { let h=0,w=0; ph.steps.forEach(s => { const m = f.minutes[s.id]||0; if (s.type==='wait') w+=m; else h+=m; }); per.push({title:ph.title,h,w}); $(`[data-sub="${ph.id}"]`).textContent = fmt(h+w); });
+    const f = readForm(); const per = phaseSplit(f.minutes, MODEL);
+    per.forEach(p => { $(`[data-sub="${p.id}"]`).textContent = p.b ? `${fmt(p.w)} idle counted · ${fmt(p.b)} in the background` : fmt(p.h + p.w); });
     $('#t-hours').textContent = Math.floor(f.total/60); $('#t-mins').textContent = Math.round(f.total%60);
-    $('#t-hands').textContent = fmt(f.hands); $('#t-wait').textContent = fmt(f.wait);
-    $('#bars').innerHTML = barsHTML(per, f.total);
+    $('#t-hands').textContent = fmt(f.hands); $('#t-wait').textContent = fmt(f.wait); $('#t-bg').textContent = fmt(f.bg);
+    $('#bars').innerHTML = barsHTML(per, f.total, f.bg);
     return f;
   }
-  function barsHTML(per, total){
+  function barsHTML(per, total, bg){
     const max = Math.max(1, ...per.map(p => p.h + p.w));
     return per.map(p => { const t = p.h+p.w, pct = total ? Math.round(t/total*100) : 0;
-      return `<div class="bar"><div>${esc(p.title)}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v num">${pct}%</div></div>`; }).join('');
+      return `<div class="bar"><div>${esc(p.title)}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v num">${pct}%</div></div>`; }).join('')
+      + (bg ? `<div class="bgline">Data transfer runs for ${fmt(bg)} in the background and is not counted. Only idle minutes during it are.</div>` : '');
   }
   let saveT;
   function saveDraft(){
@@ -465,6 +490,7 @@
     clearForm();
     $('#m-name').value = e.name || ''; $('#m-date').value = e.date || (e.createdAt || '').slice(0,10); $('#m-exp').value = e.exp || ''; $('#m-store').value = e.store || '';
     STEPS.forEach(st => { const m = e.minutes?.[st.id]; if (m != null && m !== '') $(`[data-min="${st.id}"]`).value = m; const n = e.notes?.[st.id]; if (n) $(`[data-note="${st.id}"]`).value = n; });
+    { const d = derive(e.minutes, e.model); if (d.idleEstimated) $('[data-min="idle"]').value = d.idle; }
     lockForm(false);
     const save = $('#b-save'); save.disabled = false; save.textContent = 'Save changes';
     $('#b-cancel-edit').hidden = false; $('#b-new').hidden = true; $('#b-reset').hidden = true;
@@ -546,10 +572,11 @@
   // ---------- form actions ----------
   $('#b-reset').onclick = () => { if (!confirm('Clear every number and note on this form?')) return; document.querySelectorAll('.row input').forEach(i => i.value = ''); compute(); saveDraft(); };
   $('#b-copy').onclick = async () => {
-    const f = compute(); const per = PHASES.map(ph => ({ title: ph.title, t: ph.steps.reduce((a,s)=>a+(f.minutes[s.id]||0),0), w: ph.steps.filter(s=>s.type==='wait').reduce((a,s)=>a+(f.minutes[s.id]||0),0) }));
+    const f = compute(); const per = phaseSplit(f.minutes, MODEL);
     const lines = [`*360 Pro install time study* · ${f.name || 'Installer'}${f.exp ? ` · ${f.exp} installs` : ''}${f.store ? ` · ${f.store}` : ''}`,
-      `Typical time on site, 1 station: *${fmt(f.total)}* (hands-on ${fmt(f.hands)}, waiting ${fmt(f.wait)})`, ''];
-    per.forEach(p => { if (p.t) lines.push(`• ${p.title}: ${fmt(p.t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}`); });
+      `Typical time on site, 1 station: *${fmt(f.total)}* (hands-on ${fmt(f.hands)}, waiting ${fmt(f.wait)})`,
+      f.bg ? `Data transfer ran alongside for ${fmt(f.bg)}; only ${fmt(derive(f.minutes, MODEL).idle)} idle counted` : '', ''];
+    per.forEach(p => { const t = p.h + p.w; if (t || p.b) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}${p.b ? ` · ${fmt(p.b)} in the background` : ''}`); });
     const notes = Object.entries(f.notes).map(([id, v]) => `• ${STEP[id].name}: ${v}`); if (notes.length) lines.push('', '*What slows it down*', ...notes);
     await copy(lines.join('\n'));
   };
@@ -594,7 +621,7 @@
     { name:'Example A', exp:'50 or more', store:'Liquor', minutes:{checkin:10,photos:10,unbox:15,brain:10,ups:5,wake:10,printer:10,term:15,lcd:10,periph:15,cables:20,isp:10,pull:45,convert:30,scan:20,sale:10,lte:10,fixes:15,batch:15,switch:20,walk:20,qc:15,lead:15,notes:10,traffic:15,mxq:20,other:5} },
     { name:'Example B', exp:'6 to 20', store:'Convenience', minutes:{checkin:15,photos:15,unbox:20,brain:15,ups:5,wake:15,printer:15,term:25,lcd:15,periph:20,cables:30,isp:15,pull:60,convert:45,scan:30,sale:15,lte:15,fixes:30,batch:20,switch:25,walk:25,qc:20,lead:25,notes:15,traffic:25,mxq:30,other:10} },
     { name:'Example C', exp:'1 to 5', store:'Smoke shop', minutes:{checkin:15,photos:20,unbox:25,brain:20,ups:10,wake:20,printer:20,term:30,lcd:20,periph:25,cables:40,isp:20,pull:60,convert:60,scan:40,sale:20,lte:20,fixes:45,batch:30,switch:30,walk:30,qc:25,lead:30,notes:20,traffic:30,mxq:45,other:15} },
-  ].map(e => { let h=0,w=0; STEPS.forEach(s => { const m=e.minutes[s.id]||0; if (s.type==='wait') w+=m; else h+=m; }); return {...e, hands:h, wait:w, total:h+w, notes:{}, date:'', example:true}; });
+  ].map((e, i) => { e.minutes.idle = [5, 10, 20][i]; const d = derive(e.minutes, MODEL); return {...e, hands:d.hands, wait:d.wait, bg:d.bg, total:d.total, model:MODEL, notes:{}, date:'', example:true}; });
   let showExamples = false;
 
   async function refresh(){
@@ -620,10 +647,13 @@
     const per = {}; STEPS.forEach(s => per[s.id] = []);
     list.forEach(e => STEPS.forEach(s => { const m = Number(e.minutes?.[s.id]); if (!isNaN(m) && m > 0) per[s.id].push(m); }));
     const step = STEPS.map(s => { const a = per[s.id]; return { ...s, n:a.length, avg:mean(a), med:median(a), min:a.length?Math.min(...a):0, max:a.length?Math.max(...a):0 }; });
-    const phase = PHASES.map(ph => { const h = step.filter(s=>s.phase===ph.id && s.type!=='wait').reduce((x,s)=>x+s.avg,0), w = step.filter(s=>s.phase===ph.id && s.type==='wait').reduce((x,s)=>x+s.avg,0); return { title: ph.title, h, w }; });
-    const totals = list.map(e => Number(e.total)||0), hands = list.map(e => Number(e.hands)||0), waits = list.map(e => Number(e.wait)||0);
+    const derived = list.map(e => derive(e.minutes, e.model));
+    const splits = list.map(e => phaseSplit(e.minutes, e.model));
+    const phase = PHASES.map((ph, i) => ({ id: ph.id, title: ph.title, h: mean(splits.map(sp => sp[i].h)), w: mean(splits.map(sp => sp[i].w)), b: mean(splits.map(sp => sp[i].b)) }));
+    const totals = derived.map(d => d.total), hands = derived.map(d => d.hands), waits = derived.map(d => d.wait), bgs = derived.map(d => d.bg), idles = derived.map(d => d.idle);
+    const estimated = derived.filter(d => d.idleEstimated).length;
     const people = new Set(list.map(e => (e.name||'').trim().toLowerCase()).filter(Boolean)).size;
-    return { step, phase, n:list.length, people, avgTotal:mean(totals), medTotal:median(totals), avgHands:mean(hands), avgWait:mean(waits), minTotal: totals.length?Math.min(...totals):0, maxTotal: totals.length?Math.max(...totals):0 };
+    return { step, phase, derived, n:list.length, people, estimated, avgTotal:mean(totals), medTotal:median(totals), avgHands:mean(hands), avgWait:mean(waits), avgBg:mean(bgs), avgIdle:mean(idles), minTotal: totals.length?Math.min(...totals):0, maxTotal: totals.length?Math.max(...totals):0 };
   }
 
   let lastStats = null;
@@ -642,7 +672,7 @@
     }
     const S = stats(list); lastStats = S;
     const maxAvg = Math.max(1, ...S.step.map(s => s.avg));
-    const topHands = [...S.step].filter(s => s.type!=='wait' && s.n).sort((a,b)=>b.avg-a.avg).slice(0,3);
+    const topHands = [...S.step].filter(s => s.type!=='wait' && s.type!=='bg' && s.n).sort((a,b)=>b.avg-a.avg).slice(0,3);
     const topWait = [...S.step].filter(s => s.type==='wait' && s.n).sort((a,b)=>b.avg-a.avg).slice(0,3);
     const notes = []; list.forEach(e => Object.entries(e.notes||{}).forEach(([id,v]) => { if (STEP[id] && v) notes.push({ step: STEP[id].name, by: e.name || 'Installer', v }); }));
     const ex = usingExamples ? `<span class="pill">Example data</span>` : '';
@@ -651,7 +681,7 @@
     PHASES.forEach(ph => {
       rows += `<tr class="ph"><td colspan="6">${esc(ph.title)}</td></tr>`;
       S.step.filter(s => s.phase===ph.id).forEach(s => {
-        rows += `<tr class="${s.type==='wait'?'wait':''}"><td><i class="k"></i>${esc(s.name)}</td><td class="r num"><b>${s.n ? Math.round(s.avg) : '–'}</b></td><td class="r num">${s.n ? Math.round(s.med) : '–'}</td><td class="rng num">${s.n ? `${s.min} to ${s.max}` : '–'}</td><td class="r num">${s.n}</td><td><div class="trk"><i style="width:${s.avg/maxAvg*100}%"></i></div></td></tr>`;
+        rows += `<tr class="${s.type==='wait'?'wait':s.type==='bg'?'bg':''}"><td><i class="k"></i>${esc(s.name)}</td><td class="r num"><b>${s.n ? Math.round(s.avg) : '–'}</b></td><td class="r num">${s.n ? Math.round(s.med) : '–'}</td><td class="rng num">${s.n ? `${s.min} to ${s.max}` : '–'}</td><td class="r num">${s.n}</td><td><div class="trk"><i style="width:${s.avg/maxAvg*100}%"></i></div></td></tr>`;
       });
     });
 
@@ -662,20 +692,21 @@
         <div class="kpi"><div class="lbl">Waiting or interrupted</div><div class="n num">${fmt(S.avgWait)}</div><div class="sub2">${S.avgTotal ? Math.round(S.avgWait/S.avgTotal*100) : 0}% of the visit</div></div>
         <div class="kpi"><div class="lbl">Studies</div><div class="n num">${S.n}<small>from ${S.people} ${S.people===1?'installer':'installers'}</small></div><div class="sub2">${fexp ? `Filtered to ${esc(fexp)} installs` : 'All experience levels'}</div></div>
       </div>
+      ${S.avgBg ? `<div class="bgnote"><b>Data transfer averages ${fmt(S.avgBg)} per install and is not counted in time on site.</b> It runs in the background while the crew keeps working. Only the idle minutes during it count, averaging ${fmt(S.avgIdle)}.${S.estimated ? ` ${S.estimated} older ${S.estimated===1?'study has':'studies have'} no idle figure, so 10% of their transfer time is used as the estimate.` : ''}</div>` : ''}
       <div class="grid2">
-        <div class="card"><h3>Where the time goes</h3><div class="hint">Average minutes per phase. Vermilion is hands-on, gray is waiting.</div>${barsHTML(S.phase, S.avgTotal)}</div>
+        <div class="card"><h3>Where the time goes</h3><div class="hint">Average minutes per phase. Vermilion is hands-on, gray is waiting.</div>${barsHTML(S.phase, S.avgTotal, S.avgBg)}</div>
         <div class="card"><h3>Biggest time sinks</h3><div class="hint">Average minutes per step, hands-on and waiting.</div>
           <ol class="top3">${topHands.map((s,i)=>`<li><span class="rk">${i+1}</span><span>${esc(s.name)}<small>Hands-on · ${esc(s.phaseTitle)}</small></span><span class="v num">${Math.round(s.avg)} min</span></li>`).join('')}
           ${topWait.map((s,i)=>`<li><span class="rk" style="color:var(--wait)">${i+1}</span><span>${esc(s.name)}<small>Waiting · ${esc(s.phaseTitle)}</small></span><span class="v num">${Math.round(s.avg)} min</span></li>`).join('')}</ol></div>
       </div>
-      <div class="card" style="margin-top:14px"><h3>Every step</h3><div class="hint">Minutes. Average, median, and the range reported. Steps nobody has timed show a dash.</div>
+      <div class="card" style="margin-top:14px"><h3>Every step</h3><div class="hint">Minutes. Average, median, and the range reported. Steps nobody has timed show a dash. Background steps are shown for reference and do not add to time on site.</div>
         <div class="tbl-wrap"><table class="steps-tbl"><thead><tr><th>Step</th><th class="r">Avg</th><th class="r">Median</th><th>Range</th><th class="r">N</th><th style="width:22%">Relative</th></tr></thead><tbody>${rows}</tbody></table></div></div>
       <div class="grid2">
         <div class="card"><h3>What slows it down</h3><div class="hint">Notes installers left on individual steps.</div>
           ${notes.length ? `<ul class="notes">${notes.slice(0,40).map(n=>`<li><span class="st">${esc(n.step)}</span>${esc(n.v)} <span class="by">· ${esc(n.by)}</span></li>`).join('')}</ul>` : `<p class="hint">No notes yet.</p>`}</div>
         <div class="card"><h3>Saved studies</h3><div class="hint">Newest first. The Steps column shows how many of the ${STEPS.length} steps have a time; a low count usually means an unfinished entry.${isAdmin ? ' You can edit or remove any entry.' : ' You can edit or remove your own.'}</div>
           <div class="tbl-wrap"><table class="entries"><thead><tr><th>Date</th><th>Installer</th><th>Experience</th><th class="r">Total</th><th class="r">Hands-on</th><th class="r">Waiting</th><th class="r">Steps</th><th></th></tr></thead><tbody>
-          ${list.slice(0,60).map(e => `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(e.total)}</b></td><td class="r num">${fmt(e.hands)}</td><td class="r num">${fmt(e.wait)}</td><td class="r num" title="Steps with a time entered">${Object.values(e.minutes||{}).filter(v => Number(v) > 0).length}<span style="color:var(--muted)">/${STEPS.length}</span></td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-edit="${esc(e.id)}">Edit</button> <button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`).join('')}
+          ${list.slice(0,60).map((e, i) => { const d = derive(e.minutes, e.model); return `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(d.total)}</b>${d.idleEstimated ? '<span style="color:var(--muted)" title="Idle time estimated at 10% of data transfer">*</span>' : ''}</td><td class="r num">${fmt(d.hands)}</td><td class="r num">${fmt(d.wait)}</td><td class="r num" title="Steps with a time entered">${Object.values(e.minutes||{}).filter(v => Number(v) > 0).length}<span style="color:var(--muted)">/${STEPS.length}</span></td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-edit="${esc(e.id)}">Edit</button> <button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`; }).join('')}
           </tbody></table></div></div>
       </div>`;
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { const e = entries.find(x => x.id === b.dataset.edit); if (e) beginEdit(e); });
@@ -691,16 +722,17 @@
     if (!lastStats || !lastStats.n) { toast('Nothing to summarize yet.'); return; }
     const S = lastStats; const fexp = $('#f-exp').value;
     const lines = [`*360 Pro install time study, team averages*${fexp ? ` · ${fexp} installs` : ''} · ${S.n} ${S.n===1?'study':'studies'} from ${S.people} ${S.people===1?'installer':'installers'}`,
-      `Average time on site, 1 station: *${fmt(S.avgTotal)}* (hands-on ${fmt(S.avgHands)}, waiting ${fmt(S.avgWait)}) · median ${fmt(S.medTotal)}`, ''];
-    S.phase.forEach(p => { const t = p.h+p.w; if (t) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}`); });
+      `Average time on site, 1 station: *${fmt(S.avgTotal)}* (hands-on ${fmt(S.avgHands)}, waiting ${fmt(S.avgWait)}) · median ${fmt(S.medTotal)}`,
+      S.avgBg ? `Data transfer runs alongside for ${fmt(S.avgBg)} on average and is not counted; idle time during it averages ${fmt(S.avgIdle)}` : '', ''];
+    S.phase.forEach(p => { const t = p.h+p.w; if (t || p.b) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}${p.b ? ` · ${fmt(p.b)} in the background` : ''}`); });
     const top = [...S.step].filter(s=>s.n).sort((a,b)=>b.avg-a.avg).slice(0,5);
     if (top.length) lines.push('', '*Biggest time sinks*', ...top.map(s => `• ${s.name}: ${Math.round(s.avg)} min avg (${s.min} to ${s.max}, n=${s.n})`));
     await copy(lines.join('\n'));
   };
   $('#b-export').onclick = async () => {
     if (!downloads && mode !== 'rest') return;
-    const head = ['Date','Installer','Installs completed','Store type','Total min','Hands-on min','Waiting min', ...STEPS.map(s => s.name), ...STEPS.map(s => 'Note: ' + s.name)];
-    const rows = entries.map(e => [e.date, e.name, e.exp, e.store, e.total, e.hands, e.wait, ...STEPS.map(s => e.minutes?.[s.id] ?? ''), ...STEPS.map(s => e.notes?.[s.id] ?? '')]);
+    const head = ['Date','Installer','Installs completed','Store type','Time on site min','Hands-on min','Waiting min','Data transfer background min','Idle during transfer min','Idle estimated', ...STEPS.map(s => s.name), ...STEPS.map(s => 'Note: ' + s.name)];
+    const rows = entries.map(e => { const d = derive(e.minutes, e.model); return [e.date, e.name, e.exp, e.store, d.total, d.hands, d.wait, d.bg, d.idle, d.idleEstimated ? 'yes' : '', ...STEPS.map(s => e.minutes?.[s.id] ?? ''), ...STEPS.map(s => e.notes?.[s.id] ?? '')]; });
     const csv = [head, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
     const filename = `360pro-time-studies-${new Date().toISOString().slice(0,10)}.csv`;
     if (downloads) { try { await downloads.save({ filename, data: csv }); } catch(e){ if (!(e && e.code === 'cancelled')) toast('The download did not go through.'); } return; }

@@ -41,6 +41,8 @@
   .legend{ margin-top:.14in; display:flex; gap:.22in; align-items:center; font-size:7.8pt; color:#333; }
   .legend .sw{ display:inline-block; width:.14in; height:.14in; border-radius:2px; vertical-align:-.02in; margin-right:.05in; }
   .legend .sw.hands{ background:var(--verm); } .legend .sw.wait{ background:var(--wait); }
+  .legend .sw.bg, .row.bg .name .k{ background:repeating-linear-gradient(45deg, var(--wait) 0 2px, #fff 2px 5px); border:1px solid var(--wait); }
+  .bar.bgline{ display:block; font-size:7.4pt; color:var(--mid); margin-top:.06in; }
 
   /* phases */
   .phase{ margin-top:.14in; }
@@ -127,7 +129,7 @@
   </header>
 
   <section class="intro">
-    <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time you spend waiting on someone else or handling interruptions. Totals update as you type, and the sheet remembers your numbers on this device.</p>
+    <p>Enter how long each step <b>typically</b> takes you at a single-register store, in minutes. Not your best day, not your worst. Vermilion rows are hands-on work. Gray rows are time you spend waiting on someone else or handling interruptions. Data transfer runs in the background while you keep working, so only the minutes you were actually idle count. Totals update as you type, and the sheet remembers your numbers on this device.</p>
     <div class="meta">
       <div><label for="m-name">Installer</label><input id="m-name" data-key="name" placeholder="Your name"></div>
       <div><label for="m-date">Date</label><input id="m-date" data-key="date" type="date"></div>
@@ -137,7 +139,7 @@
     </div>
   </section>
 
-  <div class="legend"><span><i class="sw hands"></i>Hands-on time</span><span><i class="sw wait"></i>Waiting or interrupted</span><span style="margin-left:auto;color:var(--mid)">Minutes, whole numbers are fine</span></div>
+  <div class="legend"><span><i class="sw hands"></i>Hands-on time</span><span><i class="sw wait"></i>Waiting or interrupted</span><span><i class="sw bg"></i>Background, not counted</span><span style="margin-left:auto;color:var(--mid)">Minutes, whole numbers are fine</span></div>
 
   <div id="phases"></div>
 
@@ -145,7 +147,7 @@
     <div class="big">
       <div class="lbl">Typical time on site, one station</div>
       <div class="num"><span id="t-hours">0</span><small>hr</small><span id="t-mins" style="margin-left:.10in">0</span><small>min</small></div>
-      <div class="split"><span>Hands-on <b id="t-hands">0 min</b></span><span>Waiting <b id="t-wait">0 min</b></span></div>
+      <div class="split"><span>Hands-on <b id="t-hands">0 min</b></span><span>Waiting <b id="t-wait">0 min</b></span><span>Data transfer alongside <b id="t-bg">0 min</b></span></div>
     </div>
     <div class="bars">
       <h4>Where the time goes</h4>
@@ -188,8 +190,9 @@
       { id:'isp',     name:'Wait for online confirmation', sub:'Tech confirms store ISP and LTE', type:'wait' },
     ]},
     { id:'data', n:'', title:'Data transfer', steps:[
-      { id:'pull',    name:'Data pull from the old register', sub:'Data Transfer Team works the old system', type:'wait' },
-      { id:'convert', name:'Data conversion', sub:'Waiting for the converted database to land', type:'wait' },
+      { id:'pull',    name:'Data pull from the old register', sub:'How long it runs while you keep working', type:'bg' },
+      { id:'convert', name:'Data conversion', sub:'How long it runs, until the converted database lands', type:'bg' },
+      { id:'idle',    name:'Idle during data transfer', sub:'Of that time, the minutes you were stuck with nothing else to do', type:'wait' },
     ]},
     { id:'test', n:'', title:'Prove it works', steps:[
       { id:'scan',    name:'Scan 20 items and check pricing' },
@@ -223,7 +226,7 @@
     const sec = document.createElement('section'); sec.className = 'phase';
     sec.innerHTML = `<div class="phase-h"><h2>${ph.n ? `<span>${ph.n}</span>` : ''}${ph.title}</h2><div class="col" style="text-align:right">Minutes</div><div class="col">Notes, what makes it slow</div></div>`;
     ph.steps.forEach(st => {
-      const row = document.createElement('div'); row.className = 'row' + (st.type === 'wait' ? ' wait' : '');
+      const row = document.createElement('div'); row.className = 'row' + (st.type === 'wait' ? ' wait' : st.type === 'bg' ? ' bg' : '');
       row.innerHTML = `<div class="name"><i class="k" title="${st.type==='wait'?'Waiting':'Hands-on'}"></i><div>${st.name}${st.sub ? `<small>${st.sub}</small>` : ''}</div></div>
         <input class="min" type="number" min="0" step="1" inputmode="numeric" placeholder="0" data-min="${st.id}" aria-label="Minutes for ${st.name}">
         <input class="note" type="text" placeholder="Optional" data-note="${st.id}" aria-label="Notes for ${st.name}">`;
@@ -245,24 +248,25 @@
   function fmt(m){ m = Math.round(m); return m >= 60 ? `${Math.floor(m/60)} hr ${m%60} min` : `${m} min`; }
 
   function compute(){
-    let hands = 0, wait = 0; const per = [];
+    let hands = 0, wait = 0, bg = 0; const per = [];
     PHASES.forEach(ph => {
-      let h = 0, w = 0;
-      ph.steps.forEach(st => { const m = minutesOf(st.id); if (st.type === 'wait') w += m; else h += m; });
-      per.push({ title: ph.title, h, w }); hands += h; wait += w;
-      document.querySelector(`[data-sub="${ph.id}"]`).textContent = fmt(h + w);
+      let h = 0, w = 0, b = 0;
+      ph.steps.forEach(st => { const m = minutesOf(st.id); if (st.type === 'wait') w += m; else if (st.type === 'bg') b += m; else h += m; });
+      per.push({ title: ph.title, h, w, b }); hands += h; wait += w; bg += b;
+      document.querySelector(`[data-sub="${ph.id}"]`).textContent = b ? `${fmt(w)} idle counted · ${fmt(b)} in the background` : fmt(h + w);
     });
     const total = hands + wait;
     $('#t-hours').textContent = Math.floor(total/60);
     $('#t-mins').textContent = Math.round(total % 60);
     $('#t-hands').textContent = fmt(hands);
     $('#t-wait').textContent = fmt(wait);
+    $('#t-bg').textContent = fmt(bg);
     const max = Math.max(1, ...per.map(p => p.h + p.w));
     $('#bars').innerHTML = per.map(p => {
       const t = p.h + p.w, pct = total ? Math.round(t / total * 100) : 0;
       return `<div class="bar"><div>${p.title}</div><div class="trk"><div class="fh" style="width:${p.h/max*100}%"></div><div class="fw" style="width:${p.w/max*100}%"></div></div><div class="v">${pct}%</div></div>`;
-    }).join('');
-    return { hands, wait, total, per };
+    }).join('') + (bg ? `<div class="bar bgline">Data transfer runs for ${fmt(bg)} in the background and is not counted. Only idle minutes during it are.</div>` : '');
+    return { hands, wait, bg, total, per };
   }
 
   let t;
@@ -282,8 +286,9 @@
   $('#b-copy').onclick = async () => {
     const r = compute(); const name = $('#m-name').value || 'Installer'; const exp = $('#m-exp').value; const store = $('#m-store').value;
     const lines = [`*360 Pro install time study* · ${name}${exp ? ` · ${exp} installs` : ''}${store ? ` · ${store}` : ''}`,
-      `Typical time on site, 1 station: *${fmt(r.total)}* (hands-on ${fmt(r.hands)}, waiting ${fmt(r.wait)})`, ''];
-    r.per.forEach(p => { const t = p.h + p.w; if (t) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}`); });
+      `Typical time on site, 1 station: *${fmt(r.total)}* (hands-on ${fmt(r.hands)}, waiting ${fmt(r.wait)})`,
+      r.bg ? `Data transfer ran alongside for ${fmt(r.bg)}; only idle minutes counted` : '', ''];
+    r.per.forEach(p => { const t = p.h + p.w; if (t || p.b) lines.push(`• ${p.title}: ${fmt(t)}${p.w ? ` (${fmt(p.w)} waiting)` : ''}${p.b ? ` · ${fmt(p.b)} in the background` : ''}`); });
     const notes = []; document.querySelectorAll('[data-note]').forEach(i => { if (i.value.trim()) { const id = i.dataset.note; const st = PHASES.flatMap(p => p.steps).find(s => s.id === id); notes.push(`• ${st.name}: ${i.value.trim()}`); } });
     if (notes.length) lines.push('', '*What slows it down*', ...notes);
     const text = lines.join('\n');
@@ -292,8 +297,8 @@
   };
   $('#b-csv').onclick = () => {
     const rows = [['Phase','Step','Type','Minutes','Notes']];
-    PHASES.forEach(ph => ph.steps.forEach(st => rows.push([ph.title, st.name.replace(/^\d+ · /,''), st.type === 'wait' ? 'Waiting' : 'Hands-on', minutesOf(st.id), document.querySelector(`[data-note="${st.id}"]`).value])));
-    const r = compute(); rows.push([], ['Total','','', r.total, ''], ['Hands-on','','', r.hands, ''], ['Waiting','','', r.wait, '']);
+    PHASES.forEach(ph => ph.steps.forEach(st => rows.push([ph.title, st.name.replace(/^\d+ · /,''), st.type === 'wait' ? 'Waiting' : st.type === 'bg' ? 'Background, not counted' : 'Hands-on', minutesOf(st.id), document.querySelector(`[data-note="${st.id}"]`).value])));
+    const r = compute(); rows.push([], ['Total','','', r.total, ''], ['Hands-on','','', r.hands, ''], ['Waiting','','', r.wait, ''], ['Data transfer, background','','', r.bg, '']);
     const meta = [['Installer', $('#m-name').value], ['Date', $('#m-date').value], ['Installs completed', $('#m-exp').value], ['Store type', $('#m-store').value], []];
     const csv = [...meta, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g,'""')}"`).join(',')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = `360pro-time-study-${($('#m-name').value || 'installer').replace(/\s+/g,'-').toLowerCase()}-${$('#m-date').value || 'undated'}.csv`; a.click(); URL.revokeObjectURL(a.href);
