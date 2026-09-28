@@ -415,7 +415,8 @@
     minutes = minutes || {}; let hands = 0, wait = 0, bg = 0;
     STEPS.forEach(st => { const m = Number(minutes[st.id]) || 0; if (m <= 0) return; if (st.type === 'bg') bg += m; else if (st.type === 'wait') wait += m; else hands += m; });
     let idleEstimated = false, idle = Number(minutes.idle) || 0;
-    if (Number(model) < MODEL && bg > 0 && !(minutes.idle > 0)) { idle = Math.round(bg * IDLE_ESTIMATE); wait += idle; idleEstimated = true; }
+    const ver = Number(model) || 1; // studies saved before the model field are version 1
+    if (ver < MODEL && bg > 0 && !(Number(minutes.idle) > 0)) { idle = Math.round(bg * IDLE_ESTIMATE); wait += idle; idleEstimated = true; }
     return { hands, wait, bg, idle, total: hands + wait, idleEstimated };
   }
   const minutesOf = id => { const n = parseFloat($(`[data-min="${id}"]`).value); return isNaN(n) || n < 0 ? 0 : n; };
