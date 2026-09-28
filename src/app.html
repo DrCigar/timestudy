@@ -166,6 +166,35 @@
   .steps-tbl tr.wait .trk i{ background:var(--wait); }
   .steps-tbl td.rng{ color:var(--muted); white-space:nowrap; }
   .tbl-wrap{ overflow-x:auto; }
+  /* minutes-per-step chart */
+  .ch-head{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; }
+  .ch-head .hint{ margin:0; flex:1; }
+  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:3px; overflow:hidden; }
+  .seg button{ background:transparent; border:0; color:var(--muted); font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:7px 12px; }
+  .seg button[aria-pressed="true"]{ background:var(--text); color:var(--ground); }
+  .chart{ --lbl:250px; --val:56px; position:relative; }
+  .ch-axis{ display:grid; grid-template-columns:var(--lbl) 1fr var(--val); gap:0 10px; height:22px; }
+  .ch-axis .ticks{ position:relative; border-bottom:1px solid var(--line); }
+  .ch-axis .ticks span{ position:absolute; top:0; transform:translateX(-50%); font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .ch-axis .ticks span::after{ content:""; position:absolute; left:50%; bottom:-1px; width:1px; height:4px; background:var(--line); }
+  .ch-ph{ display:grid; grid-template-columns:var(--lbl) 1fr var(--val); gap:0 10px; margin-top:10px; }
+  .ch-ph div{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; color:var(--muted); padding-bottom:3px; }
+  .ch-row{ display:grid; grid-template-columns:var(--lbl) 1fr var(--val); gap:0 10px; align-items:center; height:24px; }
+  .ch-row .ch-lbl{ font-size:13px; font-weight:300; letter-spacing:0; text-transform:none; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:baseline; gap:6px; }
+  .ch-row .ch-lbl small{ color:var(--muted); font-size:11px; }
+  .ch-row .trk{ position:relative; height:100%; background-image:linear-gradient(to right, var(--line2) 0 1px, transparent 1px); background-size:var(--tick) 100%; background-repeat:repeat-x; }
+  .ch-row .bar{ position:absolute; left:0; top:5px; height:14px; border-radius:0 3px 3px 0; background:var(--verm); min-width:2px; transition:width .25s ease; }
+  .ch-row.wait .bar{ background:var(--wait); }
+  .ch-row.bg .bar{ background:repeating-linear-gradient(45deg, var(--wait) 0 3px, transparent 3px 6px); border:1px solid var(--wait); top:4px; height:16px; }
+  .ch-row .val{ font-size:13px; font-weight:700; text-align:right; font-variant-numeric:tabular-nums; color:var(--text); }
+  .ch-row.bg .val{ color:var(--muted); font-weight:400; }
+  .ch-row:hover .trk{ background-color:var(--surface2); }
+  .ch-legend{ display:flex; gap:18px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); margin-top:10px; padding-top:8px; border-top:1px solid var(--line2); }
+  .ch-tip{ position:fixed; z-index:8; pointer-events:none; background:var(--ink); color:#fff; border-left:3px solid var(--verm); padding:8px 11px; font-size:12.5px; line-height:1.4; border-radius:3px; box-shadow:0 8px 24px rgba(0,0,0,.35); max-width:260px; }
+  .ch-tip b{ display:block; font-size:13px; margin-bottom:2px; }
+  .ch-tip span{ color:#CFCFCF; }
+  @media (max-width:640px){ .chart{ --lbl:130px; --val:44px; } .ch-row .ch-lbl{ font-size:12px; } }
+  @media (prefers-reduced-motion:reduce){ .ch-row .bar{ transition:none; } }
   .top3{ list-style:none; }
   .top3 li{ display:grid; grid-template-columns:28px 1fr auto; gap:10px; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line2); }
   .top3 li:last-child{ border-bottom:0; }
@@ -653,6 +682,33 @@
     return { step, phase, derived, n:list.length, people, avgTotal:mean(totals), medTotal:median(totals), avgHands:mean(hands), avgWait:mean(waits), avgBg:mean(bgs), avgIdle:mean(idles), minTotal: totals.length?Math.min(...totals):0, maxTotal: totals.length?Math.max(...totals):0 };
   }
 
+  let chartSort = 'order';
+  try { chartSort = localStorage.getItem('pos360-ts-chart-sort') || 'order'; } catch(e){}
+  function niceTick(max){ for (const t of [5, 10, 15, 20, 30, 45, 60, 90, 120]) if (max / t <= 6) return t; return 120; }
+  function chartHTML(S){
+    const steps = S.step.filter(st => st.n);
+    if (!steps.length) return '<p class="hint">No step times yet.</p>';
+    const max = Math.max(...steps.map(st => st.avg)), tick = niceTick(max), top = Math.ceil(max / tick) * tick || tick;
+    const ticks = []; for (let v = 0; v <= top; v += tick) ticks.push(v);
+    const axis = `<div class="ch-axis"><div></div><div class="ticks">${ticks.map(v => `<span style="left:${v/top*100}%">${v}</span>`).join('')}</div><div></div></div>`;
+    const row = st => `<div class="ch-row ${st.type==='wait'?'wait':st.type==='bg'?'bg':''}" data-step="${st.id}"><div class="ch-lbl" title="${esc(st.name)}">${esc(st.name.replace(/^\d+ · /,''))}${chartSort==='avg' ? `<small>${esc(st.phaseTitle)}</small>` : ''}</div><div class="trk" style="--tick:${tick/top*100}%"><div class="bar" style="width:${st.avg/top*100}%"></div></div><div class="val">${Math.round(st.avg)}</div></div>`;
+    let body = '';
+    if (chartSort === 'avg') body = [...steps].sort((a,b) => b.avg - a.avg).map(row).join('');
+    else PHASES.forEach(ph => { const list = steps.filter(st => st.phase === ph.id); if (!list.length) return; body += `<div class="ch-ph"><div>${esc(ph.title)}</div><div></div><div></div></div>` + list.map(row).join(''); });
+    return `<div class="chart">${axis}${body}</div>
+      <div class="ch-legend"><span><i class="sw hands"></i>Hands-on</span><span><i class="sw wait"></i>Waiting or interrupted</span><span><i class="sw bg"></i>Runs in the background, not counted</span><span style="margin-left:auto">Average minutes across ${S.n} ${S.n===1?'study':'studies'}</span></div>`;
+  }
+  function wireChart(S){
+    document.querySelectorAll('[data-sort]').forEach(b => b.onclick = () => { chartSort = b.dataset.sort; try { localStorage.setItem('pos360-ts-chart-sort', chartSort); } catch(e){} renderSummary(); });
+    let tip = $('#ch-tip'); if (!tip) { tip = document.createElement('div'); tip.id = 'ch-tip'; tip.className = 'ch-tip'; tip.hidden = true; document.body.appendChild(tip); }
+    document.querySelectorAll('.ch-row').forEach(r => {
+      const st = S.step.find(x => x.id === r.dataset.step); if (!st) return;
+      r.onmouseenter = () => { tip.innerHTML = `<b>${esc(st.name)}</b><span>${st.type==='bg' ? 'Runs in the background, not counted' : st.type==='wait' ? 'Waiting or interrupted' : 'Hands-on'} · ${esc(st.phaseTitle)}</span><br>Average ${Math.round(st.avg)} min · median ${Math.round(st.med)} min<br><span>Range ${st.min} to ${st.max} · ${st.n} ${st.n===1?'study':'studies'}</span>`; tip.hidden = false; };
+      r.onmousemove = ev => { const w = tip.offsetWidth, h = tip.offsetHeight; let x = ev.clientX + 14, y = ev.clientY + 14; if (x + w > innerWidth - 8) x = ev.clientX - w - 14; if (y + h > innerHeight - 8) y = ev.clientY - h - 14; tip.style.left = x + 'px'; tip.style.top = y + 'px'; };
+      r.onmouseleave = () => { tip.hidden = true; };
+    });
+  }
+
   let lastStats = null;
   async function renderSummary(){
     const body = $('#sum-body'); const fexp = $('#f-exp').value;
@@ -696,6 +752,10 @@
           <ol class="top3">${topHands.map((s,i)=>`<li><span class="rk">${i+1}</span><span>${esc(s.name)}<small>Hands-on · ${esc(s.phaseTitle)}</small></span><span class="v num">${Math.round(s.avg)} min</span></li>`).join('')}
           ${topWait.map((s,i)=>`<li><span class="rk" style="color:var(--wait)">${i+1}</span><span>${esc(s.name)}<small>Waiting · ${esc(s.phaseTitle)}</small></span><span class="v num">${Math.round(s.avg)} min</span></li>`).join('')}</ol></div>
       </div>
+      <div class="card" style="margin-top:14px"><h3>Minutes per step</h3>
+        <div class="ch-head"><div class="hint">Average minutes for each step. Longer bar, longer step. Hover a bar for the median and range.</div>
+          <div class="seg" role="group" aria-label="Sort"><button type="button" data-sort="order" aria-pressed="${chartSort==='order'}">Install order</button><button type="button" data-sort="avg" aria-pressed="${chartSort==='avg'}">Longest first</button></div></div>
+        ${chartHTML(S)}</div>
       <div class="card" style="margin-top:14px"><h3>Every step</h3><div class="hint">Minutes. Average, median, and the range reported. Steps nobody has timed show a dash. Background steps are shown for reference and do not add to time on site.</div>
         <div class="tbl-wrap"><table class="steps-tbl"><thead><tr><th>Step</th><th class="r">Avg</th><th class="r">Median</th><th>Range</th><th class="r">N</th><th style="width:22%">Relative</th></tr></thead><tbody>${rows}</tbody></table></div></div>
       <div class="grid2">
@@ -706,6 +766,7 @@
           ${list.slice(0,60).map((e, i) => { const d = derive(e.minutes, e.model); return `<tr><td class="num">${esc(e.date || (e.createdAt||'').slice(0,10))}</td><td>${esc(e.name||'Installer')}${e.store ? `<span style="color:var(--muted)"> · ${esc(e.store)}</span>` : ''}</td><td>${esc(e.exp||'–')}</td><td class="r num"><b>${fmt(d.total)}</b></td><td class="r num">${fmt(d.hands)}</td><td class="r num">${fmt(d.wait)}</td><td class="r num" title="Steps with a time entered">${Object.values(e.minutes||{}).filter(v => Number(v) > 0).length}<span style="color:var(--muted)">/${STEPS.length}</span></td><td>${(!usingExamples && e.id && (isAdmin || (uid && e.uid === uid))) ? `<button class="del" data-edit="${esc(e.id)}">Edit</button> <button class="del" data-del="${esc(e.id)}">Remove</button>` : ''}</td></tr>`; }).join('')}
           </tbody></table></div></div>
       </div>`;
+    wireChart(S);
     body.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { const e = entries.find(x => x.id === b.dataset.edit); if (e) beginEdit(e); });
     body.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
       if (!confirm('Remove this study from the team data?')) return;
